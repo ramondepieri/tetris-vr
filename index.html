@@ -1,0 +1,2526 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Tetris Anaglífico Dicóptico — Treino de Visão Binocular</title>
+<style>
+  :root{
+    --bg-void:#05070a;
+    --bg-panel:#0e131a;
+    --bg-panel-raised:#141b24;
+    --line-hair:#232c38;
+    --text-primary:#e7ecf2;
+    --text-dim:#7b8794;
+    --eye1-default:#0000FF;
+    --eye2-default:#230000;
+    --neutral-grid:#ffffff;
+    --focus-ring:#5fd0ff;
+    --danger:#ff5d5d;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:var(--bg-void);
+    color:var(--text-primary);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-user-select:none; user-select:none;
+    overflow:hidden;
+  }
+  #app{
+    position:relative;
+    width:100%; height:100vh;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .screen{
+    display:none;
+    width:100%; height:100%;
+    align-items:center; justify-content:center;
+    flex-direction:column;
+  }
+  .screen.active{display:flex;}
+
+  /* ---------- MENU ---------- */
+  .menu-wrap{
+    display:flex; flex-direction:column; align-items:center; gap:clamp(18px,4.5vh,40px);
+  }
+  .menu-title{
+    text-align:center;
+  }
+  .menu-title h1{
+    margin:0;
+    font-size:clamp(28px,5vw,46px);
+    font-weight:700;
+    letter-spacing:0.5px;
+    line-height:1.15;
+  }
+  .menu-title .split-r{color:var(--eye1-default);}
+  .menu-title .split-c{color:var(--eye2-default);}
+  .menu-title p{
+    margin:10px 0 0;
+    color:var(--text-dim);
+    font-size:14px;
+    letter-spacing:0.3px;
+  }
+  .menu-buttons{
+    display:flex; flex-direction:column; gap:16px;
+    width:min(320px,80vw);
+  }
+  .menu-btn{
+    padding:16px 22px;
+    background:var(--bg-panel);
+    border:1px solid var(--line-hair);
+    border-radius:10px;
+    color:var(--text-primary);
+    font-size:17px;
+    text-align:left;
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease, transform .1s ease;
+    position:relative;
+  }
+  .menu-btn .btn-sub{
+    display:block;
+    color:var(--text-dim);
+    font-size:12px;
+    margin-top:3px;
+    font-weight:400;
+  }
+  .menu-btn:hover{background:var(--bg-panel-raised);}
+  .menu-btn.focused{
+    border-color:var(--focus-ring);
+    box-shadow:0 0 0 2px rgba(95,208,255,0.18);
+  }
+  .menu-btn:active{transform:scale(0.98);}
+  .gamepad-hint{
+    color:var(--text-dim);
+    font-size:12px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .pad-dot{
+    width:8px; height:8px; border-radius:50%;
+    background:#3a4451;
+    transition:background .2s;
+  }
+  .pad-dot.on{background:#5cd85c; box-shadow:0 0 6px #5cd85c;}
+
+  /* ---------- CALIBRATION ---------- */
+  .calib-panel{
+    width:min(640px,92vw);
+    background:var(--bg-panel);
+    border:1px solid var(--line-hair);
+    border-radius:14px;
+    padding:28px clamp(18px,4vw,34px);
+    max-height:92vh;
+    overflow-y:auto;
+  }
+  .calib-panel h2{
+    margin:0 0 4px;
+    font-size:20px;
+    font-weight:700;
+  }
+  .calib-panel .calib-desc{
+    margin:0 0 24px;
+    color:var(--text-dim);
+    font-size:13px;
+    line-height:1.5;
+  }
+  .calib-row{
+    display:flex; align-items:center; gap:14px;
+    padding:14px 0;
+    border-top:1px solid var(--line-hair);
+  }
+  .calib-row:first-of-type{border-top:none;}
+  .calib-swatch{
+    width:34px; height:34px; border-radius:8px;
+    border:1px solid var(--line-hair);
+    flex:none;
+  }
+  .calib-fields{flex:1; min-width:0;}
+  .calib-label{
+    font-size:13px; font-weight:600;
+    display:flex; justify-content:space-between;
+    margin-bottom:8px;
+  }
+  .calib-label span.tag{
+    font-weight:400; color:var(--text-dim); font-size:12px;
+  }
+  .calib-controls{
+    display:flex; align-items:center; gap:12px;
+  }
+  input[type="range"]{
+    flex:1; height:4px;
+    -webkit-appearance:none; appearance:none;
+    background:var(--line-hair);
+    border-radius:2px;
+    outline:none;
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:16px; height:16px; border-radius:50%;
+    background:var(--focus-ring);
+    cursor:pointer;
+    border:2px solid #05070a;
+  }
+  input[type="range"]::-moz-range-thumb{
+    width:16px; height:16px; border-radius:50%;
+    background:var(--focus-ring);
+    cursor:pointer;
+    border:2px solid #05070a;
+  }
+  .range-val{
+    width:38px; text-align:right;
+    font-variant-numeric:tabular-nums;
+    color:var(--text-dim); font-size:12px;
+  }
+  .calib-preview{
+    margin:22px 0 8px;
+    background:#000;
+    border-radius:10px;
+    border:1px solid var(--line-hair);
+    display:flex; align-items:center; justify-content:center;
+    padding:22px 10px;
+    gap:14px;
+    flex-wrap:wrap;
+  }
+  .preview-block{
+    width:30px; height:30px;
+    border:none;
+  }
+  .preview-caption{
+    text-align:center;
+    color:var(--text-dim);
+    font-size:11px;
+    margin:0 0 18px;
+  }
+  .calib-actions{
+    display:flex; gap:12px; margin-top:22px;
+  }
+  .btn{
+    flex:1;
+    padding:13px 16px;
+    border-radius:9px;
+    border:1px solid var(--line-hair);
+    background:var(--bg-panel-raised);
+    color:var(--text-primary);
+    font-size:14px; font-weight:600;
+    cursor:pointer;
+  }
+  .btn.primary{
+    background:var(--focus-ring);
+    color:#04121a;
+    border-color:var(--focus-ring);
+  }
+  .btn.ghost{background:transparent;}
+  .btn:active{transform:scale(0.98);}
+  .btn.focused{box-shadow:0 0 0 2px rgba(95,208,255,0.5);}
+  input[type="range"].focused{
+    outline:2px solid rgba(95,208,255,0.7);
+    outline-offset:6px;
+  }
+
+  /* ---------- GAME ---------- */
+  .game-wrap{
+    display:flex; align-items:flex-start; justify-content:center;
+    gap:22px;
+    padding:20px;
+  }
+  #board-canvas{
+    background:#000;
+    /* Neutral frame: only the board boundary is visible to both eyes. */
+    border:2px solid rgba(255,255,255,0.55);
+    border-radius:0;
+    display:block;
+  }
+  .side-panel{
+    width:170px;
+    display:flex; flex-direction:column; gap:14px;
+  }
+  .panel-card{
+    background:var(--bg-panel);
+    border:1px solid var(--line-hair);
+    border-radius:10px;
+    padding:12px 14px;
+  }
+  .panel-card h3{
+    margin:0 0 6px;
+    font-size:11px;
+    letter-spacing:0.4px;
+    color:var(--text-dim);
+    font-weight:600;
+  }
+  .panel-card .val{
+    font-size:22px; font-weight:700;
+    font-variant-numeric:tabular-nums;
+  }
+  #next-canvas{
+    background:#000;
+    border-radius:6px;
+    display:block;
+    margin-top:2px;
+  }
+  .icon-btn{
+    width:100%;
+    padding:10px;
+    border-radius:9px;
+    border:1px solid var(--line-hair);
+    background:var(--bg-panel-raised);
+    color:var(--text-primary);
+    font-size:13px;
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+  }
+  .gear{
+    width:14px; height:14px;
+    border:2px solid currentColor;
+    border-radius:50%;
+    position:relative;
+  }
+  .pad-status{
+    font-size:11px;
+    color:var(--text-dim);
+    display:flex; align-items:center; gap:6px;
+    padding:2px 2px;
+  }
+
+  /* ---------- OVERLAYS ---------- */
+  .overlay{
+    position:fixed; inset:0;
+    background:rgba(3,5,8,0.86);
+    display:none;
+    align-items:center; justify-content:center;
+    z-index:50;
+  }
+  .overlay.active{display:flex;}
+  .overlay-panel{
+    width:min(300px,86vw);
+    background:var(--bg-panel);
+    border:1px solid var(--line-hair);
+    border-radius:14px;
+    padding:26px 22px;
+    text-align:center;
+  }
+  .overlay-panel h2{margin:0 0 18px; font-size:19px;}
+  .overlay-buttons{display:flex; flex-direction:column; gap:10px;}
+  .lines-flash{
+    animation:flash .12s ease-in-out 2;
+  }
+  @keyframes flash{0%{filter:brightness(1);}50%{filter:brightness(2.4);}100%{filter:brightness(1);}}
+
+  @media (max-width:640px){
+    .game-wrap{flex-direction:column; align-items:center; padding:10px;}
+    .side-panel{width:min(300px,92vw); flex-direction:row; flex-wrap:wrap;}
+    .side-panel .panel-card{flex:1 1 42%;}
+  }
+  /* ---------- PROGRESSO / JORNADA ---------- */
+  :root{
+    --gold:#ffcf5a;
+    --gold-deep:#ff9f43;
+    --mint:#5cd8a4;
+  }
+  .unlock-banner{
+    max-width:min(340px,86vw);
+    text-align:center;
+    padding:10px 14px;
+    border-radius:10px;
+    border:1px solid rgba(255,207,90,0.45);
+    background:rgba(255,207,90,0.08);
+    color:var(--gold);
+    font-size:13px;
+    line-height:1.4;
+  }
+  .unlock-banner[hidden]{display:none;}
+  .menu-stats{
+    display:flex; flex-wrap:wrap; justify-content:center; gap:6px 16px;
+    max-width:min(420px,90vw);
+    color:var(--text-dim);
+    font-size:12px;
+  }
+  .menu-stats b{color:var(--text-primary); font-weight:600;}
+
+  .panel-row{display:flex; gap:10px;}
+  .panel-row .panel-card{flex:1; min-width:0; padding:10px 12px;}
+  .val-sm{font-size:16px !important;}
+  .goal-bar{
+    height:6px; border-radius:3px;
+    background:var(--line-hair);
+    margin-top:8px; overflow:hidden;
+  }
+  /* Neutral bar inside the game screen so it does not favour either eye. */
+  .goal-bar span{
+    display:block; height:100%; width:0%;
+    background:#cfd8e3;
+    transition:width .4s ease;
+  }
+  .goal-note{margin-top:6px; font-size:11px; color:var(--text-dim);}
+
+  .go-record{margin:-4px 0 10px; font-size:14px; font-weight:700; color:var(--gold);}
+  .go-unlock{margin:0 0 10px; font-size:13px; color:var(--mint);}
+  .go-quote{margin:0 0 16px; font-size:12px; font-style:italic; color:var(--text-dim); line-height:1.45;}
+  .go-record:empty,.go-unlock:empty,.go-quote:empty{display:none;}
+
+  .journey-panel{
+    width:min(720px,94vw);
+    max-height:94vh;
+    overflow-y:auto;
+    background:var(--bg-panel);
+    border:1px solid var(--line-hair);
+    border-radius:16px;
+    padding:clamp(18px,4vw,32px);
+  }
+  .journey-panel h2{
+    margin:0 0 6px;
+    font-size:clamp(22px,4vw,28px);
+    background:linear-gradient(90deg,var(--gold),var(--gold-deep));
+    -webkit-background-clip:text; background-clip:text;
+    color:transparent;
+  }
+  .journey-quote{
+    margin:0 0 20px;
+    color:var(--text-dim);
+    font-size:14px; font-style:italic; line-height:1.5;
+  }
+  .journey-stats{
+    display:grid; grid-template-columns:repeat(4,1fr); gap:10px;
+  }
+  .jstat{
+    background:var(--bg-panel-raised);
+    border:1px solid var(--line-hair);
+    border-radius:10px;
+    padding:12px 8px;
+    text-align:center;
+  }
+  .jstat-val{display:block; font-size:18px; font-weight:700; font-variant-numeric:tabular-nums;}
+  .jstat-lbl{display:block; margin-top:3px; font-size:11px; color:var(--text-dim);}
+  .journey-next{
+    margin-top:14px;
+    padding:14px 16px;
+    border-radius:12px;
+    border:1px solid rgba(95,208,255,0.4);
+    background:rgba(95,208,255,0.06);
+  }
+  .jnext-title{font-size:14px; font-weight:600; margin-bottom:10px;}
+  .jbar{height:10px; border-radius:5px; background:var(--line-hair); overflow:hidden;}
+  .jbar span{
+    display:block; height:100%;
+    background:linear-gradient(90deg,var(--focus-ring),var(--mint));
+    border-radius:5px;
+  }
+  .jnext-meta{margin-top:8px; font-size:12px; color:var(--text-dim);}
+
+  .journey-trail{margin-top:26px;}
+  .jnode{position:relative; display:flex; gap:16px; padding-bottom:22px;}
+  .jnode.last{padding-bottom:0;}
+  .jnode::before{
+    content:""; position:absolute;
+    left:20px; top:22px; height:100%; width:4px; border-radius:2px;
+    background:linear-gradient(to bottom,
+      var(--gold) 0, var(--gold) var(--seg),
+      var(--line-hair) var(--seg), var(--line-hair) 100%);
+  }
+  .jnode.last::before{display:none;}
+  .jmarker{
+    position:relative; z-index:1; flex:none;
+    width:44px; height:44px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:20px;
+    background:var(--bg-panel-raised);
+    border:3px solid var(--line-hair);
+  }
+  .jnode.done .jmarker{
+    background:linear-gradient(135deg,var(--gold),var(--gold-deep));
+    border-color:#ffe3a0;
+    box-shadow:0 0 14px rgba(255,191,80,0.35);
+  }
+  .jnode.current .jmarker{
+    border-color:var(--focus-ring);
+    animation:jpulse 1.8s ease-in-out infinite;
+  }
+  .jnode.locked .jmarker{filter:grayscale(1); opacity:0.55;}
+  @keyframes jpulse{
+    0%,100%{box-shadow:0 0 0 0 rgba(95,208,255,0.55);}
+    50%{box-shadow:0 0 0 10px rgba(95,208,255,0);}
+  }
+  .jcard{
+    flex:1; min-width:0;
+    background:var(--bg-panel-raised);
+    border:1px solid var(--line-hair);
+    border-radius:12px;
+    padding:14px 16px;
+  }
+  .jnode.done .jcard{border-color:rgba(255,207,90,0.35);}
+  .jnode.current .jcard{border-color:var(--focus-ring); box-shadow:0 0 0 2px rgba(95,208,255,0.15);}
+  .jnode.locked .jcard{opacity:0.6;}
+  .jwhen{font-size:11px; letter-spacing:0.4px; color:var(--text-dim); font-weight:600;}
+  .jnode.done .jwhen{color:var(--gold);}
+  .jnode.current .jwhen{color:var(--focus-ring);}
+  .jcard h4{margin:4px 0 6px; font-size:16px;}
+  .jtext{margin:0; font-size:13px; line-height:1.55; color:#c3ccd6;}
+  .jcheer{margin:8px 0 0; font-size:12px; font-style:italic; color:var(--mint);}
+  .jcard .jbar{margin-top:12px;}
+  .jmeta{margin-top:6px; font-size:11px; color:var(--text-dim);}
+  .journey-note{
+    margin:22px 0 0;
+    font-size:11px; line-height:1.5; color:var(--text-dim); text-align:center;
+  }
+
+  /* ---------- MODO VR (lado a lado) ---------- */
+  #screen-menu{justify-content:flex-start; overflow-y:auto;}
+  #screen-menu .menu-wrap{margin:auto; padding:18px 0;}
+  #screen-vrsetup{justify-content:flex-start; overflow-y:auto;}
+  #screen-vrsetup .calib-panel{margin:auto; max-height:none; padding-bottom:0;}
+  #screen-vrsetup .calib-actions{
+    position:sticky; bottom:0;
+    margin-top:18px; padding:12px 0 16px;
+    background:var(--bg-panel);
+    border-top:1px solid var(--line-hair);
+  }
+  #screen-vr{position:fixed; inset:0; z-index:40; background:#000;}
+  #vr-canvas{
+    position:fixed; inset:0;
+    width:100vw; height:100vh;
+    background:#000; display:block;
+    touch-action:none;
+  }
+  select.sel{
+    flex:1; min-width:0;
+    padding:10px 12px;
+    background:var(--bg-panel-raised);
+    color:var(--text-primary);
+    border:1px solid var(--line-hair);
+    border-radius:8px;
+    font-size:14px;
+  }
+  .vr-note{margin:0 0 14px; color:var(--text-dim); font-size:12px; line-height:1.55;}
+  .vr-warn{
+    margin:0 0 14px; padding:10px 12px;
+    border:1px solid rgba(255,93,93,0.5);
+    background:rgba(255,93,93,0.08);
+    border-radius:8px;
+    color:#ffb4b4; font-size:12px; line-height:1.5;
+  }
+  details.vr-adv{margin-top:14px; border-top:1px solid var(--line-hair); padding-top:12px;}
+  details.vr-adv summary{cursor:pointer; font-size:14px; font-weight:600; padding:6px 0;}
+  .vr-row{padding:12px 0; border-top:1px solid var(--line-hair);}
+  .vr-row:first-of-type{border-top:none;}
+  .vr-row .calib-label{margin-bottom:6px;}
+  .vr-row .hint{font-size:11px; color:var(--text-dim); margin-top:4px; line-height:1.4;}
+
+  @media (min-width:641px){
+    .side-panel{max-height:calc(100vh - 40px); overflow-y:auto; scrollbar-width:none;}
+    .side-panel::-webkit-scrollbar{display:none;}
+  }
+  @media (max-width:640px){
+    .panel-row{flex:1 1 100%;}
+    .journey-stats{grid-template-columns:repeat(2,1fr);}
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ============ MENU SCREEN ============ -->
+  <div class="screen active" id="screen-menu">
+    <div class="menu-wrap">
+      <div class="menu-title">
+        <h1><span class="split-r">Tetris</span> <span class="split-c">Dicóptico</span></h1>
+        <p>Treino de visão binocular com óculos anaglifos</p>
+      </div>
+      <div class="unlock-banner" id="menu-banner" hidden></div>
+      <div class="menu-buttons">
+        <button class="menu-btn focused" data-action="start-game" id="btn-start">
+          Iniciar Jogo
+          <span class="btn-sub">Carrega suas cores salvas e começa a partida</span>
+        </button>
+        <button class="menu-btn" data-action="open-journey" id="btn-journey">
+          🗺️ Minha Jornada
+          <span class="btn-sub" id="journey-sub">Veja seu progresso e os próximos marcos</span>
+        </button>
+        <button class="menu-btn" data-action="open-vr" id="btn-vr">
+          🥽 Modo VR (lado a lado)
+          <span class="btn-sub">Cores completas, sem óculos 3D: para visor de celular</span>
+        </button>
+        <button class="menu-btn" data-action="open-calib" id="btn-calib">
+          Calibrar Óculos
+          <span class="btn-sub">Ajuste as cores para o seu par de lentes</span>
+        </button>
+      </div>
+      <div class="menu-stats" id="menu-stats"></div>
+      <div class="gamepad-hint">
+        <span class="pad-dot" id="menu-pad-dot"></span>
+        <span id="menu-pad-text">Controle desconectado</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CALIBRATION SCREEN ============ -->
+  <div class="screen" id="screen-calib">
+    <div class="calib-panel">
+      <h2>Calibração dos Óculos</h2>
+      <p class="calib-desc">
+        Coloque os óculos 3D. Para calibrar o Olho 1, feche o olho esquerdo (lente vermelha)
+        e ajuste o slider até o quadrado vermelho desaparecer no fundo preto através da lente ciano.
+        Depois, para calibrar o Olho 2, feche o olho direito (lente ciano) e ajuste o slider até o
+        quadrado ciano desaparecer através da lente vermelha. O objetivo é minimizar o "vazamento"
+        da cor destinada ao outro olho; por isso o slider pode chegar a preto.
+      </p>
+
+      <div class="calib-row">
+        <div class="calib-swatch" id="swatch-eye1"></div>
+        <div class="calib-fields">
+          <div class="calib-label">Olho 1 — Peça ciano <span class="tag">Minimizar no olho direito / ciano</span></div>
+          <div class="calib-controls">
+            <input type="range" id="slider-eye1" min="0" max="100" value="100">
+            <span class="range-val" id="val-eye1">100%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="calib-row">
+        <div class="calib-swatch" id="swatch-eye2"></div>
+        <div class="calib-fields">
+          <div class="calib-label">Olho 2 — Peça vermelha <span class="tag">Minimizar no olho esquerdo / vermelho</span></div>
+          <div class="calib-controls">
+            <input type="range" id="slider-eye2" min="0" max="100" value="100">
+            <span class="range-val" id="val-eye2">100%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="calib-row">
+        <div class="calib-swatch" style="background:#888;"></div>
+        <div class="calib-fields">
+          <div class="calib-label">Brilho <span class="tag">Intensidade das peças</span></div>
+          <div class="calib-controls">
+            <input type="range" id="slider-brightness" min="10" max="100" value="100">
+            <span class="range-val" id="val-brightness">100%</span>
+          </div>
+        </div>
+      </div>
+
+      <p class="preview-caption">Pré-visualização — teste com os óculos colocados</p>
+      <div class="calib-preview">
+        <div class="preview-block" id="preview-eye1"></div>
+        <div class="preview-block" id="preview-eye2"></div>
+        <div class="preview-block" id="preview-eye1b"></div>
+        <div class="preview-block" id="preview-eye2b"></div>
+      </div>
+
+      <div class="calib-actions">
+        <button class="btn ghost" id="btn-reset-defaults" data-action="reset-calib">Resetar Padrões</button>
+        <button class="btn ghost" id="btn-back-calib" data-action="back-calib">Voltar sem Salvar</button>
+        <button class="btn primary" id="btn-save-calib" data-action="save-calib">Salvar e Voltar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ VR SETUP SCREEN ============ -->
+  <div class="screen" id="screen-vrsetup">
+    <div class="calib-panel" id="vr-panel">
+      <h2>🥽 Modo VR — lado a lado</h2>
+      <p class="calib-desc">
+        Para usar com um visor de celular (tipo Cardboard). A tela é dividida ao meio: o olho
+        esquerdo vê a metade esquerda e o direito vê a metade direita, em cores completas, sem
+        óculos 3D. Como no modo normal, um olho vê só a peça que cai e o outro só a pilha de peças,
+        então os dois precisam trabalhar juntos. Use o celular na horizontal.
+      </p>
+      <p class="vr-note">
+        Fluxo: ajuste aqui com o celular na mão → toque em <b>Iniciar</b> → encaixe no visor.
+        Dentro do visor, com um controle Bluetooth, <b>Start</b> abre o menu de ajustes.
+        Sem controle, dá para jogar por toque: deslize para os lados para mover, deslize para baixo
+        para descer, toque para girar e toque com dois dedos para pausar.
+      </p>
+
+      <div class="vr-row">
+        <div class="calib-label">Olho esquerdo vê <span class="tag" id="vr-eyes-hint"></span></div>
+        <div class="calib-controls">
+          <select class="sel" id="vr-leftsees">
+            <option value="falling">a peça que cai</option>
+            <option value="stack">a pilha de peças</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="vr-row">
+        <div class="calib-label">Contraste — olho esquerdo <span class="tag" id="vr-v-cL"></span></div>
+        <div class="calib-controls"><input type="range" id="vr-cL" min="10" max="100" step="5"></div>
+      </div>
+      <div class="vr-row">
+        <div class="calib-label">Contraste — olho direito <span class="tag" id="vr-v-cR"></span></div>
+        <div class="calib-controls"><input type="range" id="vr-cR" min="10" max="100" step="5"></div>
+        <div class="hint">Na terapia dicóptica costuma-se reduzir o contraste do olho dominante para o olho mais fraco participar. O valor ideal deve vir do seu oftalmologista.</div>
+      </div>
+      <div class="vr-row">
+        <div class="calib-label">Brilho geral <span class="tag" id="vr-v-bright"></span></div>
+        <div class="calib-controls"><input type="range" id="vr-bright" min="30" max="100" step="5"></div>
+      </div>
+      <div class="vr-row">
+        <div class="calib-label">Separação das imagens <span class="tag" id="vr-v-sep"></span></div>
+        <div class="calib-controls"><input type="range" id="vr-sep" min="-15" max="30" step="0.5"></div>
+        <div class="hint">Alinha as duas imagens ao centro das lentes do visor. Ajuste até a moldura branca virar uma só, confortável.</div>
+      </div>
+      <div class="vr-row">
+        <div class="calib-label">Tamanho do tabuleiro <span class="tag" id="vr-v-scale"></span></div>
+        <div class="calib-controls"><input type="range" id="vr-scale" min="50" max="110" step="5"></div>
+      </div>
+
+      <details class="vr-adv">
+        <summary>Avançado: compensação do desvio (prisma digital)</summary>
+        <p class="vr-warn">
+          Deixe tudo em <b>0</b> se você usa o óculos com prisma dentro do visor, para não corrigir
+          duas vezes. Use estes valores só com a orientação do seu oftalmologista (valores em
+          dioptrias prismáticas, da receita). A conversão para pixels é estimada e varia de visor
+          para visor; um valor errado pode causar visão dupla ou desconforto.
+          Positivo = deslocar a imagem em direção ao nariz (corrige esotropia).
+        </p>
+        <div class="vr-row">
+          <div class="calib-label">Horizontal — olho esquerdo (DP) <span class="tag" id="vr-v-hL"></span></div>
+          <div class="calib-controls"><input type="range" id="vr-hL" min="-30" max="30" step="0.5"></div>
+        </div>
+        <div class="vr-row">
+          <div class="calib-label">Horizontal — olho direito (DP) <span class="tag" id="vr-v-hR"></span></div>
+          <div class="calib-controls"><input type="range" id="vr-hR" min="-30" max="30" step="0.5"></div>
+        </div>
+        <div class="vr-row">
+          <div class="calib-label">Vertical — olho esquerdo (DP) <span class="tag" id="vr-v-vL"></span></div>
+          <div class="calib-controls"><input type="range" id="vr-vL" min="-10" max="10" step="0.5"></div>
+        </div>
+        <div class="vr-row">
+          <div class="calib-label">Vertical — olho direito (DP) <span class="tag" id="vr-v-vR"></span></div>
+          <div class="calib-controls"><input type="range" id="vr-vR" min="-10" max="10" step="0.5"></div>
+          <div class="hint">Positivo = para cima.</div>
+        </div>
+        <div class="vr-row">
+          <div class="calib-label">Campo de visão estimado por olho <span class="tag" id="vr-v-fov"></span></div>
+          <div class="calib-controls"><input type="range" id="vr-fov" min="40" max="120" step="5"></div>
+          <div class="hint">Usado só para converter DP em pixels. Visores baratos costumam ter entre 70° e 90°.</div>
+        </div>
+      </details>
+
+      <div class="calib-actions">
+        <button class="btn ghost" data-action="vr-reset">Padrões</button>
+        <button class="btn ghost" data-action="vr-back">Voltar</button>
+        <button class="btn primary" data-action="vr-start">Iniciar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ VR GAME SCREEN ============ -->
+  <div class="screen" id="screen-vr">
+    <canvas id="vr-canvas"></canvas>
+  </div>
+
+  <!-- ============ JOURNEY SCREEN ============ -->
+  <div class="screen" id="screen-journey">
+    <div class="journey-panel" id="journey-panel">
+      <h2>🗺️ Jornada da Visão</h2>
+      <p class="journey-quote" id="journey-quote"></p>
+
+      <div class="journey-stats">
+        <div class="jstat"><span class="jstat-val" id="j-total">0 s</span><span class="jstat-lbl">terapia total</span></div>
+        <div class="jstat"><span class="jstat-val" id="j-streak">0 dias</span><span class="jstat-lbl">sequência (meta de 15 min)</span></div>
+        <div class="jstat"><span class="jstat-val" id="j-high">0</span><span class="jstat-lbl">recorde</span></div>
+        <div class="jstat"><span class="jstat-val" id="j-today">0 s</span><span class="jstat-lbl">hoje</span></div>
+      </div>
+
+      <div class="journey-next" id="journey-next"></div>
+
+      <div class="journey-trail" id="journey-trail"></div>
+
+      <p class="journey-note">
+        Os marcos descrevem experiências comumente relatadas e servem como guia de motivação:
+        cada pessoa evolui no seu próprio ritmo. Continue com o acompanhamento do seu oftalmologista.
+      </p>
+
+      <div class="calib-actions">
+        <button class="btn ghost" id="btn-export" data-action="export-progress">⬇ Exportar progresso</button>
+        <button class="btn primary focused" data-action="back-journey">Voltar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ GAME SCREEN ============ -->
+  <div class="screen" id="screen-game">
+    <div class="game-wrap">
+      <canvas id="board-canvas"></canvas>
+      <div class="side-panel">
+        <div class="panel-card">
+          <h3>PONTUAÇÃO</h3>
+          <div class="val" id="stat-score">0</div>
+        </div>
+        <div class="panel-card">
+          <h3>RECORDE</h3>
+          <div class="val" id="stat-high">0</div>
+        </div>
+        <div class="panel-row">
+          <div class="panel-card">
+            <h3>NÍVEL</h3>
+            <div class="val" id="stat-level">1</div>
+          </div>
+          <div class="panel-card">
+            <h3>LINHAS</h3>
+            <div class="val" id="stat-lines">0</div>
+          </div>
+        </div>
+        <div class="panel-card">
+          <h3>PRÓXIMA</h3>
+          <canvas id="next-canvas" width="96" height="96"></canvas>
+        </div>
+        <div class="panel-card">
+          <h3>TERAPIA HOJE</h3>
+          <div class="val val-sm" id="stat-today">00:00 / 15:00</div>
+          <div class="goal-bar"><span id="bar-today"></span></div>
+          <div class="goal-note" id="note-today">Meta diária: 15 min</div>
+        </div>
+        <button class="icon-btn" id="btn-pause" data-action="pause-game">
+          <span class="gear"></span> Pausar / Calibrar
+        </button>
+        <div class="pad-status">
+          <span class="pad-dot" id="game-pad-dot"></span>
+          <span id="game-pad-text">Controle desconectado</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============ PAUSE OVERLAY ============ -->
+<div class="overlay" id="overlay-pause">
+  <div class="overlay-panel">
+    <h2>Jogo Pausado</h2>
+    <div class="overlay-buttons">
+      <button class="btn primary focused" data-action="resume-game">Continuar</button>
+      <button class="btn" data-action="pause-open-calib">Calibrar Óculos</button>
+      <button class="btn ghost" data-action="quit-to-menu">Sair para o Menu</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ GAME OVER OVERLAY ============ -->
+<div class="overlay" id="overlay-gameover">
+  <div class="overlay-panel">
+    <h2>Fim de Jogo</h2>
+    <p style="color:var(--text-dim); margin-top:-10px; font-size:13px;" id="gameover-summary"></p>
+    <p class="go-record" id="gameover-record"></p>
+    <p class="go-unlock" id="gameover-unlock"></p>
+    <p class="go-quote" id="gameover-quote"></p>
+    <div class="overlay-buttons">
+      <button class="btn primary focused" data-action="restart-game">Jogar Novamente</button>
+      <button class="btn ghost" data-action="quit-to-menu">Menu Principal</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============================================================
+     STORAGE — persist calibration in localStorage
+     ============================================================ */
+  const STORAGE_KEY = "dichopticTetris.calibration.v3";
+  const DEFAULT_CALIB = {
+    eye1Gain: 100,    // 0-100 % -> R channel. 0 can become true black.
+    eye2Gain: 100,    // 0-100 % -> G/B channels together. 0 can become true black.
+    brightness: 100   // 10-100 %, global intensity of the dichoptic pieces.
+  };
+
+  const CHANNEL_CEIL = 0xFF;
+
+  function gainToChannel(pct){
+    const f = Math.max(0, Math.min(100, pct)) / 100;
+    return Math.round(CHANNEL_CEIL * f);
+  }
+
+  function loadCalibration(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return Object.assign({}, DEFAULT_CALIB);
+      const parsed = JSON.parse(raw);
+      return Object.assign({}, DEFAULT_CALIB, parsed);
+    }catch(e){
+      return Object.assign({}, DEFAULT_CALIB);
+    }
+  }
+
+  function saveCalibration(calib){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(calib));
+      return true;
+    }catch(e){
+      return false;
+    }
+  }
+
+  /* ============================================================
+     COLOR HELPERS
+     ============================================================ */
+  function rgbToCss(r,g,b,a){
+    a = (a===undefined) ? 1 : a;
+    return "rgba(" + Math.round(r) + "," + Math.round(g) + "," + Math.round(b) + "," + a + ")";
+  }
+
+  /* ============================================================
+     GLOBAL STATE
+     ============================================================ */
+  /* ============================================================
+     PROGRESSO DA TERAPIA — recorde, tempo de terapia e jornada
+     Chaves no localStorage (fáceis de inspecionar no DevTools):
+       dichopticTetris.highScore       -> recorde (número)
+       dichopticTetris.therapySeconds  -> tempo total jogado, em segundos
+       dichopticTetris.dailyLog        -> {"AAAA-MM-DD": segundos}
+     ============================================================ */
+  const LS_HIGH  = "dichopticTetris.highScore";
+  const LS_TIME  = "dichopticTetris.therapySeconds";
+  const LS_DAYS  = "dichopticTetris.dailyLog";
+  const LS_CELEB = "dichopticTetris.celebratedMilestone";
+  const DAILY_GOAL_SEC = 15 * 60;
+
+  // "min" = minutos ACUMULADOS de terapia necessários (15 min/dia => semana = 105 min).
+  const MILESTONES = [
+    { min:0,    when:"Ponto de partida", emoji:"🌱", title:"Linha de largada",
+      text:"Todo grande caminho começa com um primeiro passo. Seu cérebro está prestes a receber o convite para usar os dois olhos em equipe.",
+      cheer:"Você já fez a parte mais difícil: começar." },
+    { min:15,   when:"Dia 1", emoji:"🎮", title:"Primeiro contato",
+      text:"O cérebro estranha a novidade: é normal sentir um esforço extra ou um leve cansaço. É sinal de que o olho esquerdo está sendo chamado para participar.",
+      cheer:"Primeiro dia no bolso! 💪" },
+    { min:45,   when:"Dia 3", emoji:"🔥", title:"Aquecendo os motores",
+      text:"As peças ficam mais fáceis de acompanhar e a estranheza das cores diminui. Seu cérebro começa a pegar o ritmo do treino.",
+      cheer:"Três dias seguidos de dedicação. A rotina está nascendo." },
+    { min:105,  when:"Semana 1", emoji:"⭐", title:"Hábito nascendo",
+      text:"Uma semana completa de 15 minutos diários! A rotina começa a se firmar e o esforço mental para jogar tende a diminuir.",
+      cheer:"Sete dias cuidando da sua visão. Isso é consistência." },
+    { min:210,  when:"Semana 2", emoji:"🌗", title:"Contraste em alerta",
+      text:"Com duas semanas de treino, é comum começar a notar mais sensibilidade ao contraste: perceber melhor objetos em ambientes de pouca luz e bordas pouco nítidas.",
+      cheer:"Repare nos detalhes ao seu redor hoje. Seu cérebro está afinando o foco." },
+    { min:315,  when:"Semana 3", emoji:"🤝", title:"Olhos trabalhando juntos",
+      text:"O cérebro vai se acostumando a considerar a imagem do olho esquerdo em vez de ignorá-la. O jogo tende a ficar mais natural e menos cansativo.",
+      cheer:"Os dois olhos estão aprendendo a jogar no mesmo time." },
+    { min:420,  when:"Semana 4", emoji:"🏅", title:"1 mês de jornada",
+      text:"Um mês de dedicação! Pode ser que você perceba mais facilidade em tarefas de coordenação visual, como encaixar peças mais rápido e estimar distâncias.",
+      cheer:"Um mês inteiro. Muita gente desiste antes. Você não." },
+    { min:630,  when:"Semana 6", emoji:"🧠", title:"Visão em equipe",
+      text:"As conexões entre os dois olhos ficam mais fortes com a repetição. Leituras longas e telas podem parecer um pouco menos cansativas.",
+      cheer:"O cérebro adora repetição. Cada partida é uma aula." },
+    { min:840,  when:"Semana 8", emoji:"🚀", title:"Dois meses de força",
+      text:"Seu foco visual tende a ficar mais estável por mais tempo. Sua pontuação e seus níveis provavelmente já contam essa história: confira seu recorde!",
+      cheer:"Dois meses de evolução silenciosa, mas real." },
+    { min:1260, when:"Semana 12", emoji:"🏔️", title:"Três meses: o grande marco",
+      text:"Você construiu um hábito sólido. É um ótimo momento para marcar uma reavaliação com seu oftalmologista e comparar como estão sua acuidade e sua visão binocular.",
+      cheer:"Três meses! Olhe para trás e orgulhe-se do caminho." },
+    { min:1890, when:"Semana 18", emoji:"👑", title:"Treinador veterano",
+      text:"Meses de constância! Sua disciplina é, por si só, uma vitória. A prática contínua ajuda a consolidar o que o cérebro já aprendeu.",
+      cheer:"Você virou referência de persistência. Siga firme." },
+    { min:2730, when:"Semana 26", emoji:"🏆", title:"Meio ano de jornada",
+      text:"Seis meses cuidando da sua visão. Poucas pessoas têm essa persistência. Mantenha o treino de manutenção e comemore com quem te apoia.",
+      cheer:"Você chegou ao topo da trilha. Que orgulho! 🎉" }
+  ];
+
+  const QUOTES = [
+    "Pequenos 15 minutos por dia constroem grandes mudanças.",
+    "Seu cérebro é plástico: cada partida é uma aula.",
+    "Constância vale mais que intensidade.",
+    "Hoje é um bom dia para empilhar mais um tijolo da sua evolução.",
+    "Cada linha completada é uma pequena vitória do seu olho esquerdo.",
+    "Quem treina todo dia não precisa de sorte.",
+    "Devagar também é progresso. O importante é não parar.",
+    "Você não está só jogando: está treinando seu cérebro a enxergar melhor.",
+    "Dia difícil? Jogue só até a meta. Seu eu do futuro agradece.",
+    "Os dois olhos formam uma equipe, e você é o técnico.",
+    "Progresso é feito de dias comuns repetidos com vontade.",
+    "Orgulhe-se: tem gente que nunca começa. Você já está aí.",
+    "Um quadrado de cada vez. Uma linha de cada vez. Um dia de cada vez.",
+    "Foco, respiração e mais uma peça!"
+  ];
+
+  function pad2(n){ return (n < 10 ? "0" : "") + n; }
+  function dayKey(d){
+    d = d || new Date();
+    return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+  }
+  function fmtClock(sec){
+    sec = Math.max(0, Math.floor(sec));
+    return pad2(Math.floor(sec / 60)) + ":" + pad2(sec % 60);
+  }
+  function fmtDuration(sec){
+    sec = Math.max(0, Math.floor(sec));
+    if(sec < 60) return sec + " s";
+    const totalMin = Math.floor(sec / 60);
+    if(totalMin < 60) return totalMin + " min";
+    return Math.floor(totalMin / 60) + "h " + pad2(totalMin % 60) + "min";
+  }
+  function dailyQuote(){
+    const d = new Date();
+    const n = Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
+    return QUOTES[n % QUOTES.length];
+  }
+  function randomQuote(){
+    return QUOTES[Math.floor(Math.random() * QUOTES.length)];
+  }
+
+  const Progress = (function(){
+    let _high = 0, _seconds = 0, _days = {}, _celebrated = 0;
+    let dirty = false, lastSaveAt = 0;
+
+    function readNumber(key){
+      try{
+        const v = parseFloat(localStorage.getItem(key));
+        return (isFinite(v) && v > 0) ? v : 0;
+      }catch(e){ return 0; }
+    }
+
+    function load(){
+      _high = Math.floor(readNumber(LS_HIGH));
+      _seconds = readNumber(LS_TIME);
+      _days = {};
+      try{
+        const raw = localStorage.getItem(LS_DAYS);
+        if(raw){
+          const parsed = JSON.parse(raw);
+          if(parsed && typeof parsed === "object"){
+            Object.keys(parsed).forEach(function(k){
+              const v = Number(parsed[k]);
+              if(isFinite(v) && v > 0) _days[k] = v;
+            });
+          }
+        }
+      }catch(e){ _days = {}; }
+      try{
+        const c = parseInt(localStorage.getItem(LS_CELEB), 10);
+        _celebrated = isFinite(c) ? c : 0;
+      }catch(e){ _celebrated = 0; }
+    }
+
+    function save(){
+      if(!dirty) return;
+      try{
+        localStorage.setItem(LS_HIGH, String(_high));
+        localStorage.setItem(LS_TIME, String(Math.round(_seconds * 10) / 10));
+        localStorage.setItem(LS_DAYS, JSON.stringify(_days));
+        dirty = false;
+      }catch(e){}
+      lastSaveAt = performance.now();
+    }
+
+    // Soma apenas tempo de jogo ativo (o loop só chama isto sem pausa).
+    function addTime(dtMs){
+      if(!(dtMs > 0)) return;
+      const s = dtMs / 1000;
+      _seconds += s;
+      const k = dayKey();
+      _days[k] = (_days[k] || 0) + s;
+      dirty = true;
+      if(performance.now() - lastSaveAt > 5000) save();
+    }
+
+    function noteScore(score){
+      if(score > _high){ _high = score; dirty = true; return true; }
+      return false;
+    }
+
+    function streak(){
+      let n = 0;
+      const d = new Date();
+      if((_days[dayKey(d)] || 0) < DAILY_GOAL_SEC) d.setDate(d.getDate() - 1);
+      while((_days[dayKey(d)] || 0) >= DAILY_GOAL_SEC){
+        n++;
+        d.setDate(d.getDate() - 1);
+      }
+      return n;
+    }
+
+    function milestoneIndex(){
+      const m = _seconds / 60;
+      let idx = 0;
+      for(let i = 0; i < MILESTONES.length; i++){
+        if(m >= MILESTONES[i].min) idx = i;
+      }
+      return idx;
+    }
+
+    function pendingCelebration(){
+      const idx = milestoneIndex();
+      return idx > _celebrated ? MILESTONES[idx] : null;
+    }
+
+    function markCelebrated(){
+      _celebrated = milestoneIndex();
+      try{ localStorage.setItem(LS_CELEB, String(_celebrated)); }catch(e){}
+    }
+
+    load();
+
+    function snapshot(){
+      save();
+      return {
+        app: "dichopticTetris",
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        highScore: _high,
+        therapySeconds: Math.round(_seconds * 10) / 10,
+        dailyLog: _days,
+        celebratedMilestone: _celebrated
+      };
+    }
+
+    return {
+      snapshot: snapshot,
+      addTime: addTime, save: save, noteScore: noteScore,
+      high: function(){ return _high; },
+      totalSeconds: function(){ return _seconds; },
+      todaySeconds: function(){ return _days[dayKey()] || 0; },
+      streak: streak, milestoneIndex: milestoneIndex,
+      pendingCelebration: pendingCelebration, markCelebrated: markCelebrated
+    };
+  })();
+
+  let hudLastSec = -1;
+  function refreshTherapyHud(force){
+    const today = Progress.todaySeconds();
+    const sec = Math.floor(today);
+    if(!force && sec === hudLastSec) return;
+    hudLastSec = sec;
+    document.getElementById("stat-today").textContent = fmtClock(today) + " / " + fmtClock(DAILY_GOAL_SEC);
+    document.getElementById("bar-today").style.width = Math.min(100, today / DAILY_GOAL_SEC * 100) + "%";
+    document.getElementById("note-today").textContent =
+      today >= DAILY_GOAL_SEC ? "✓ Meta de hoje concluída!" : "Meta diária: 15 min";
+  }
+
+  function refreshMenu(){
+    const total = Progress.totalSeconds();
+    const idx = Progress.milestoneIndex();
+    const st = Progress.streak();
+    document.getElementById("menu-stats").innerHTML =
+      "<span>⏱ Terapia: <b>" + fmtDuration(total) + "</b></span>" +
+      "<span>🏆 Recorde: <b>" + Progress.high() + "</b></span>" +
+      "<span>🔥 Sequência: <b>" + st + (st === 1 ? " dia" : " dias") + "</b></span>";
+
+    const sub = document.getElementById("journey-sub");
+    if(idx < MILESTONES.length - 1){
+      const nx = MILESTONES[idx + 1];
+      sub.textContent = "Próximo marco: " + nx.title + " (faltam " + fmtDuration(nx.min * 60 - total) + ")";
+    } else {
+      sub.textContent = "Você chegou ao topo da trilha!";
+    }
+
+    const banner = document.getElementById("menu-banner");
+    const pend = Progress.pendingCelebration();
+    if(pend){
+      banner.textContent = "🎉 Marco desbloqueado: " + pend.title + "! Veja em Minha Jornada.";
+      banner.hidden = false;
+    } else {
+      banner.hidden = true;
+    }
+  }
+
+  function renderJourney(){
+    const total = Progress.totalSeconds();
+    const idx = Progress.milestoneIndex();
+    const minutes = total / 60;
+    const lastIdx = MILESTONES.length - 1;
+
+    document.getElementById("j-total").textContent = fmtDuration(total);
+    const st = Progress.streak();
+    document.getElementById("j-streak").textContent = "🔥 " + st + (st === 1 ? " dia" : " dias");
+    document.getElementById("j-high").textContent = Progress.high();
+    document.getElementById("j-today").textContent = fmtDuration(Progress.todaySeconds());
+    document.getElementById("journey-quote").textContent = "“" + dailyQuote() + "”";
+
+    const nextBox = document.getElementById("journey-next");
+    if(idx < lastIdx){
+      const nx = MILESTONES[idx + 1];
+      const span = nx.min - MILESTONES[idx].min;
+      const pct = Math.max(0, Math.min(100, (minutes - MILESTONES[idx].min) / span * 100));
+      nextBox.innerHTML =
+        '<div class="jnext-title">Próximo marco: ' + nx.emoji + " " + nx.title + "</div>" +
+        '<div class="jbar"><span style="width:' + pct.toFixed(1) + '%"></span></div>' +
+        '<div class="jnext-meta">Faltam ' + fmtDuration(nx.min * 60 - total) + " de terapia (" + Math.round(pct) + "% do caminho)</div>";
+    } else {
+      nextBox.innerHTML =
+        '<div class="jnext-title">🏆 Você chegou ao topo da trilha!</div>' +
+        '<div class="jnext-meta">Continue treinando para manter as conquistas.</div>';
+    }
+
+    let html = "";
+    MILESTONES.forEach(function(m, i){
+      const state = i < idx ? "done" : (i === idx ? "current" : "locked");
+      let fill = 0;
+      if(i < idx) fill = 100;
+      else if(i === idx && i < lastIdx){
+        const span = MILESTONES[i + 1].min - m.min;
+        fill = Math.max(0, Math.min(100, (minutes - m.min) / span * 100));
+      }
+      const marker = state === "locked" ? "🔒" : m.emoji;
+      const need = m.min === 0 ? "" : " · " + fmtDuration(m.min * 60) + " de terapia";
+      html += '<div class="jnode ' + state + (i === lastIdx ? " last" : "") + '" style="--seg:' + fill.toFixed(1) + '%">' +
+        '<div class="jmarker">' + marker + "</div>" +
+        '<div class="jcard">' +
+          '<div class="jwhen">' + m.when.toUpperCase() + need + "</div>" +
+          "<h4>" + m.title + "</h4>" +
+          '<p class="jtext">' + m.text + "</p>" +
+          (state !== "locked" ? '<p class="jcheer">“' + m.cheer + "”</p>" : "") +
+          (state === "current" && i < lastIdx
+            ? '<div class="jbar"><span style="width:' + fill.toFixed(1) + '%"></span></div>' +
+              '<div class="jmeta">Você está aqui. Continue jogando para chegar ao próximo marco.</div>'
+            : "") +
+        "</div></div>";
+    });
+    document.getElementById("journey-trail").innerHTML = html;
+  }
+
+  function exportProgress(){
+    const data = Progress.snapshot();
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "tetris-terapia-progresso-" + dayKey() + ".json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+
+    const btn = document.getElementById("btn-export");
+    btn.textContent = "✓ Arquivo gerado";
+    setTimeout(function(){ btn.textContent = "⬇ Exportar progresso"; }, 2500);
+  }
+
+  /* ============================================================
+     MODO VR (lado a lado) — configurações, estado e controles
+     Chave no localStorage: dichopticTetris.vrSettings.v1
+     ============================================================ */
+  const LS_VR = "dichopticTetris.vrSettings.v1";
+  const DEFAULT_VR = {
+    leftSees: "falling",   // o que o olho esquerdo vê: "falling" (peça que cai) ou "stack" (pilha)
+    contrastL: 100,        // % de contraste/brilho do olho esquerdo
+    contrastR: 50,         // % do olho direito (reduzido para o olho esquerdo participar)
+    brightness: 100,       // brilho geral
+    sep: 6,                // separação: deslocamento das imagens em direção ao nariz (% da meia tela)
+    scale: 100,            // tamanho do tabuleiro
+    hL: 0, hR: 0,          // prisma digital horizontal (DP), positivo = em direção ao nariz
+    vL: 0, vR: 0,          // prisma digital vertical (DP), positivo = para cima
+    fov: 80                // campo de visão estimado por olho (graus), só para converter DP em pixels
+  };
+  const VR_LIMITS = {
+    contrastL:[10,100], contrastR:[10,100], brightness:[30,100],
+    sep:[-15,30], scale:[50,110],
+    hL:[-30,30], hR:[-30,30], vL:[-10,10], vR:[-10,10], fov:[40,120]
+  };
+
+  function loadVrSettings(){
+    const s = Object.assign({}, DEFAULT_VR);
+    try{
+      const raw = localStorage.getItem(LS_VR);
+      if(raw){
+        const p = JSON.parse(raw);
+        Object.keys(VR_LIMITS).forEach(function(k){
+          const v = Number(p[k]);
+          if(p[k] !== null && p[k] !== undefined && isFinite(v)){
+            s[k] = Math.max(VR_LIMITS[k][0], Math.min(VR_LIMITS[k][1], v));
+          }
+        });
+        if(p.leftSees === "stack" || p.leftSees === "falling") s.leftSees = p.leftSees;
+      }
+    }catch(e){}
+    return s;
+  }
+  let vr = loadVrSettings();
+  function saveVrSettings(){
+    try{ localStorage.setItem(LS_VR, JSON.stringify(vr)); }catch(e){}
+  }
+
+  const vrUI = { mode:"play", sel:0, over:null };   // mode: "play" | "pause" | "over"
+  const VR_COLORS = { I:"#22e0ff", O:"#ffd21f", T:"#b46bff", S:"#3fe06a", Z:"#ff5252", J:"#5a7dff", L:"#ff9b3a" };
+  const VR_MENU = [
+    { id:"resume", label:"Continuar" },
+    { id:"sep", label:"Separação", key:"sep", step:0.5, fmt:function(v){ return v.toFixed(1) + "%"; } },
+    { id:"cL", label:"Contraste esq.", key:"contrastL", step:5, fmt:function(v){ return Math.round(v) + "%"; } },
+    { id:"cR", label:"Contraste dir.", key:"contrastR", step:5, fmt:function(v){ return Math.round(v) + "%"; } },
+    { id:"hL", label:"Desloc. esq. (DP)", key:"hL", step:0.5, fmt:function(v){ return v.toFixed(1); } },
+    { id:"hR", label:"Desloc. dir. (DP)", key:"hR", step:0.5, fmt:function(v){ return v.toFixed(1); } },
+    { id:"quit", label:"Sair para o menu" }
+  ];
+
+  const VR_FORM = [
+    { id:"vr-cL", key:"contrastL", lbl:"vr-v-cL", fmt:function(v){ return Math.round(v) + "%"; } },
+    { id:"vr-cR", key:"contrastR", lbl:"vr-v-cR", fmt:function(v){ return Math.round(v) + "%"; } },
+    { id:"vr-bright", key:"brightness", lbl:"vr-v-bright", fmt:function(v){ return Math.round(v) + "%"; } },
+    { id:"vr-sep", key:"sep", lbl:"vr-v-sep", fmt:function(v){ return v.toFixed(1) + "%"; } },
+    { id:"vr-scale", key:"scale", lbl:"vr-v-scale", fmt:function(v){ return Math.round(v) + "%"; } },
+    { id:"vr-hL", key:"hL", lbl:"vr-v-hL", fmt:function(v){ return v.toFixed(1) + " DP"; } },
+    { id:"vr-hR", key:"hR", lbl:"vr-v-hR", fmt:function(v){ return v.toFixed(1) + " DP"; } },
+    { id:"vr-vL", key:"vL", lbl:"vr-v-vL", fmt:function(v){ return v.toFixed(1) + " DP"; } },
+    { id:"vr-vR", key:"vR", lbl:"vr-v-vR", fmt:function(v){ return v.toFixed(1) + " DP"; } },
+    { id:"vr-fov", key:"fov", lbl:"vr-v-fov", fmt:function(v){ return Math.round(v) + "°"; } }
+  ];
+
+  function updateVrEyesHint(){
+    document.getElementById("vr-eyes-hint").textContent =
+      "→ o direito vê " + (vr.leftSees === "falling" ? "a pilha de peças" : "a peça que cai");
+  }
+  function populateVrForm(){
+    VR_FORM.forEach(function(f){
+      document.getElementById(f.id).value = vr[f.key];
+      document.getElementById(f.lbl).textContent = f.fmt(Number(vr[f.key]));
+    });
+    document.getElementById("vr-leftsees").value = vr.leftSees;
+    updateVrEyesHint();
+  }
+  VR_FORM.forEach(function(f){
+    document.getElementById(f.id).addEventListener("input", function(){
+      vr[f.key] = parseFloat(this.value);
+      document.getElementById(f.lbl).textContent = f.fmt(vr[f.key]);
+    });
+  });
+  document.getElementById("vr-leftsees").addEventListener("change", function(){
+    vr.leftSees = (this.value === "stack") ? "stack" : "falling";
+    updateVrEyesHint();
+  });
+
+  // Tela cheia, orientação horizontal e tela sempre ligada (cada recurso é opcional).
+  let wakeLock = null;
+  function acquireWakeLock(){
+    try{
+      if(navigator.wakeLock && navigator.wakeLock.request){
+        navigator.wakeLock.request("screen").then(function(l){ wakeLock = l; }).catch(function(){});
+      }
+    }catch(e){}
+  }
+  function releaseWakeLock(){
+    try{ if(wakeLock) wakeLock.release(); }catch(e){}
+    wakeLock = null;
+  }
+  function enterVrFullscreen(){
+    try{
+      const root = document.documentElement;
+      if(root.requestFullscreen && !document.fullscreenElement){
+        const p = root.requestFullscreen({ navigationUI:"hide" });
+        if(p && p.then){
+          p.then(function(){
+            try{
+              if(screen.orientation && screen.orientation.lock){
+                screen.orientation.lock("landscape").catch(function(){});
+              }
+            }catch(e){}
+          }).catch(function(){});
+        }
+      }
+    }catch(e){}
+  }
+  function exitVrFullscreen(){
+    try{ if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); }catch(e){}
+    try{
+      if(document.fullscreenElement && document.exitFullscreen){
+        document.exitFullscreen().catch(function(){});
+      }
+    }catch(e){}
+  }
+
+  function vrPause(){
+    if(!Game.isRunning()) return;
+    Game.pause();
+    vrUI.mode = "pause";
+    vrUI.sel = 0;
+    Game.renderOnly();
+  }
+  function vrResume(){
+    vrUI.mode = "play";
+    Game.resume();
+  }
+  function vrRestart(){
+    vrUI.mode = "play";
+    Game.setMode("vr");
+    Game.start();
+  }
+  function vrQuit(){
+    vrUI.mode = "play";
+    Game.stop();
+    showScreen("menu");
+    releaseWakeLock();
+    exitVrFullscreen();
+    refreshMenu();
+    focusFirst(screens.menu);
+  }
+  function vrMenuMove(dir){
+    vrUI.sel = (vrUI.sel + dir + VR_MENU.length) % VR_MENU.length;
+    Game.renderOnly();
+  }
+  function vrMenuAdjust(dir){
+    const it = VR_MENU[vrUI.sel];
+    if(!it || !it.key) return;
+    const lim = VR_LIMITS[it.key];
+    let v = Math.round((vr[it.key] + dir * it.step) / it.step) * it.step;
+    vr[it.key] = Math.max(lim[0], Math.min(lim[1], v));
+    saveVrSettings();
+    Game.renderOnly();
+  }
+  function vrMenuActivate(){
+    const it = VR_MENU[vrUI.sel];
+    if(!it) return;
+    if(it.id === "resume") vrResume();
+    else if(it.id === "quit") vrQuit();
+  }
+
+  function handleVrKey(ev){
+    const k = ev.key;
+    if(vrUI.mode === "play"){
+      if(!Game.isRunning()) return;
+      switch(k){
+        case "ArrowLeft": Game.move(-1); break;
+        case "ArrowRight": Game.move(1); break;
+        case "ArrowDown": Game.softDrop(); break;
+        case "ArrowUp": case " ": Game.rotate(); break;
+        case "p": case "P": case "Escape": vrPause(); break;
+        default: return;
+      }
+      ev.preventDefault();
+    } else if(vrUI.mode === "pause"){
+      switch(k){
+        case "ArrowDown": vrMenuMove(1); break;
+        case "ArrowUp": vrMenuMove(-1); break;
+        case "ArrowLeft": vrMenuAdjust(-1); break;
+        case "ArrowRight": vrMenuAdjust(1); break;
+        case "Enter": if(!ev.repeat) vrMenuActivate(); break;
+        case "p": case "P": case "Escape": if(!ev.repeat) vrResume(); break;
+        default: return;
+      }
+      ev.preventDefault();
+    } else if(vrUI.mode === "over"){
+      if(k === "Enter"){ if(!ev.repeat) vrRestart(); ev.preventDefault(); }
+      else if(k === "Escape"){ if(!ev.repeat) vrQuit(); ev.preventDefault(); }
+    }
+  }
+
+  // Toque (para testar sem controle): deslizar move/desce, toque gira, dois dedos pausam.
+  function setupVrTouch(){
+    const cv = document.getElementById("vr-canvas");
+    let t0 = null;
+    cv.addEventListener("touchstart", function(ev){
+      ev.preventDefault();
+      if(ev.touches.length >= 2){
+        if(t0) t0.multi = true; else t0 = { multi:true, moved:true, time:0 };
+        return;
+      }
+      const t = ev.touches[0];
+      t0 = { x:t.clientX, y:t.clientY, ax:t.clientX, ay:t.clientY,
+             time:performance.now(), moved:false, multi:false, hard:false };
+    }, { passive:false });
+    cv.addEventListener("touchmove", function(ev){
+      ev.preventDefault();
+      if(!t0 || t0.multi || vrUI.mode !== "play" || !Game.isRunning()) return;
+      const t = ev.touches[0];
+      const step = Math.max(14, Game.vrCellCss());
+      while(t.clientX - t0.ax >= step){ Game.move(1); t0.ax += step; t0.moved = true; }
+      while(t0.ax - t.clientX >= step){ Game.move(-1); t0.ax -= step; t0.moved = true; }
+      while(t.clientY - t0.ay >= step * 1.2){ Game.softDrop(); t0.ay += step * 1.2; t0.moved = true; }
+      if(!t0.hard && t0.y - t.clientY >= step * 3){ Game.hardDrop(); t0.hard = true; t0.moved = true; }
+    }, { passive:false });
+    cv.addEventListener("touchend", function(ev){
+      ev.preventDefault();
+      if(!t0 || ev.touches.length > 0) return;
+      const quick = performance.now() - t0.time < 300;
+      const wasMulti = t0.multi, moved = t0.moved;
+      t0 = null;
+      if(wasMulti){ if(vrUI.mode === "play") vrPause(); return; }
+      if(moved || !quick) return;
+      if(vrUI.mode === "play") Game.rotate();
+      else if(vrUI.mode === "pause") vrResume();
+      else if(vrUI.mode === "over") vrRestart();
+    }, { passive:false });
+    cv.addEventListener("touchcancel", function(){ t0 = null; });
+  }
+
+  let calib = loadCalibration();
+  let activeCalibContext = "menu"; // "menu" | "pause" — where "back" should return to
+
+  // Pure dichoptic colors. The calibration gain spans 0..255 so the
+  // test square can actually blend into the black background.
+function currentEye1Color(){
+  const intensity = calib.eye1Gain / 100;
+  const b = Math.round(255 * intensity);
+  const alpha = Math.max(0.1, Math.min(1, calib.brightness / 100));
+  return rgbToCss(0, 0, b, alpha);
+}
+
+function currentEye2Color(){
+  const intensity = calib.eye2Gain / 100;
+  const r = Math.round(35 * intensity);
+  const alpha = Math.max(0.1, Math.min(1, calib.brightness / 100));
+  return rgbToCss(r, 0, 0, alpha);
+}
+  const NEUTRAL_GRID = "#ffffff";
+
+  /* ============================================================
+     SCREEN MANAGEMENT
+     ============================================================ */
+  const screens = {
+    menu: document.getElementById("screen-menu"),
+    calib: document.getElementById("screen-calib"),
+    journey: document.getElementById("screen-journey"),
+    vrsetup: document.getElementById("screen-vrsetup"),
+    vr: document.getElementById("screen-vr"),
+    game: document.getElementById("screen-game")
+  };
+  function showScreen(name){
+    Object.keys(screens).forEach(k => screens[k].classList.toggle("active", k===name));
+  }
+  const overlayPause = document.getElementById("overlay-pause");
+  const overlayGameOver = document.getElementById("overlay-gameover");
+  function setOverlay(el, on){ el.classList.toggle("active", !!on); }
+
+  /* ============================================================
+     FOCUS / NAVIGATION HELPERS (menu + overlays, keyboard & gamepad)
+     ============================================================ */
+  function getFocusableIn(container){
+    return Array.from(container.querySelectorAll(".menu-btn, .btn, input[type=\"range\"]"));
+  }
+  function focusFirst(container){
+    const items = getFocusableIn(container);
+    items.forEach(i=>i.classList.remove("focused"));
+    if(items[0]) items[0].classList.add("focused");
+  }
+  function moveFocus(container, dir){
+    const items = getFocusableIn(container);
+    if(!items.length) return;
+    let idx = items.findIndex(i=>i.classList.contains("focused"));
+    if(idx === -1) idx = 0;
+    items[idx].classList.remove("focused");
+    idx = (idx + dir + items.length) % items.length;
+    items[idx].classList.add("focused");
+  }
+  function activateFocused(container){
+    const items = getFocusableIn(container);
+    const el = items.find(i=>i.classList.contains("focused"));
+    if(el) el.click();
+  }
+  function currentInteractiveContainer(){
+    if(overlayGameOver.classList.contains("active")) return overlayGameOver.querySelector(".overlay-panel");
+    if(overlayPause.classList.contains("active")) return overlayPause.querySelector(".overlay-panel");
+    if(screens.menu.classList.contains("active")) return screens.menu;
+    if(screens.calib.classList.contains("active")) return screens.calib.querySelector(".calib-panel");
+    return null;
+  }
+
+  /* ============================================================
+     ACTION ROUTER — every clickable control has data-action
+     ============================================================ */
+  document.addEventListener("click", function(ev){
+    const btn = ev.target.closest("[data-action]");
+    if(!btn) return;
+    handleAction(btn.dataset.action);
+  });
+
+  function handleAction(action){
+    switch(action){
+      case "open-journey": {
+        renderJourney();
+        Progress.markCelebrated();
+        showScreen("journey");
+        const cur = document.querySelector("#journey-trail .jnode.current");
+        if(cur) cur.scrollIntoView({block:"center"});
+        break;
+      }
+      case "export-progress":
+        exportProgress();
+        break;
+      case "back-journey":
+        showScreen("menu");
+        refreshMenu();
+        focusFirst(screens.menu);
+        break;
+      case "open-vr":
+        populateVrForm();
+        showScreen("vrsetup");
+        break;
+      case "vr-reset":
+        vr = Object.assign({}, DEFAULT_VR);
+        populateVrForm();
+        saveVrSettings();
+        break;
+      case "vr-back":
+        saveVrSettings();
+        showScreen("menu");
+        refreshMenu();
+        focusFirst(screens.menu);
+        break;
+      case "vr-start":
+        saveVrSettings();
+        enterVrFullscreen();
+        acquireWakeLock();
+        vrUI.mode = "play";
+        Game.setMode("vr");
+        showScreen("vr");
+        Game.start();
+        break;
+      case "start-game":
+        calib = loadCalibration();
+        Game.setMode("ana");
+        showScreen("game");
+        Game.start();
+        break;
+      case "open-calib":
+        activeCalibContext = "menu";
+        openCalibScreen();
+        break;
+      case "pause-open-calib":
+        activeCalibContext = "pause";
+        setOverlay(overlayPause, false);
+        openCalibScreen();
+        break;
+      case "save-calib":
+        readCalibFormIntoState();
+        saveCalibration(calib);
+        returnFromCalibration();
+        break;
+      case "back-calib":
+        returnFromCalibration();
+        break;
+      case "reset-calib":
+        calib = Object.assign({}, DEFAULT_CALIB);
+        populateCalibForm();
+        break;
+      case "pause-game":
+        Game.pause();
+        setOverlay(overlayPause, true);
+        focusFirst(overlayPause.querySelector(".overlay-panel"));
+        break;
+      case "resume-game":
+        setOverlay(overlayPause, false);
+        Game.resume();
+        break;
+      case "quit-to-menu":
+        setOverlay(overlayPause, false);
+        setOverlay(overlayGameOver, false);
+        Game.stop();
+        showScreen("menu");
+        refreshMenu();
+        focusFirst(screens.menu);
+        break;
+      case "restart-game":
+        setOverlay(overlayGameOver, false);
+        Game.setMode("ana");
+        showScreen("game");
+        Game.start();
+        break;
+    }
+  }
+
+  function openCalibScreen(){
+    populateCalibForm();
+    showScreen("calib");
+    focusFirst(screens.calib.querySelector(".calib-panel"));
+  }
+
+  function returnFromCalibration(){
+    if(activeCalibContext === "pause"){
+      showScreen("game");
+      setOverlay(overlayPause, true);
+      focusFirst(overlayPause.querySelector(".overlay-panel"));
+    } else {
+      setOverlay(overlayPause, false);
+      showScreen("menu");
+      focusFirst(screens.menu);
+    }
+  }
+
+  /* ============================================================
+     CALIBRATION FORM WIRING
+     ============================================================ */
+  const el = {
+    sliderEye1: document.getElementById("slider-eye1"),
+    valEye1: document.getElementById("val-eye1"),
+    swatchEye1: document.getElementById("swatch-eye1"),
+    sliderEye2: document.getElementById("slider-eye2"),
+    valEye2: document.getElementById("val-eye2"),
+    swatchEye2: document.getElementById("swatch-eye2"),
+    sliderBrightness: document.getElementById("slider-brightness"),
+    valBrightness: document.getElementById("val-brightness"),
+    previewEye1: document.getElementById("preview-eye1"),
+    previewEye2: document.getElementById("preview-eye2"),
+    previewEye1b: document.getElementById("preview-eye1b"),
+    previewEye2b: document.getElementById("preview-eye2b")
+  };
+
+  function populateCalibForm(){
+    el.sliderEye1.value = calib.eye1Gain;
+    el.sliderEye2.value = calib.eye2Gain;
+    el.sliderBrightness.value = calib.brightness;
+    refreshCalibPreview();
+  }
+
+  function readCalibFormIntoState(){
+    calib.eye1Gain = parseInt(el.sliderEye1.value, 10);
+    calib.eye2Gain = parseInt(el.sliderEye2.value, 10);
+    calib.brightness = parseInt(el.sliderBrightness.value, 10);
+  }
+
+  function refreshCalibPreview(){
+    readCalibFormIntoState();
+    el.valEye1.textContent = calib.eye1Gain + "%";
+    el.valEye2.textContent = calib.eye2Gain + "%";
+    el.valBrightness.textContent = calib.brightness + "%";
+    const c1 = currentEye1Color();
+    const c2 = currentEye2Color();
+    el.swatchEye1.style.background = c1;
+    el.swatchEye2.style.background = c2;
+    el.previewEye1.style.background = c1;
+    el.previewEye1b.style.background = c1;
+    el.previewEye2.style.background = c2;
+    el.previewEye2b.style.background = c2;
+    if(Game.isRunning()) Game.renderOnly();
+  }
+
+  [el.sliderEye1, el.sliderEye2, el.sliderBrightness]
+    .forEach(input => input.addEventListener("input", refreshCalibPreview));
+
+  /* ============================================================
+     TETROMINO DEFINITIONS
+     ============================================================ */
+  const SHAPES = {
+    I: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],
+    O: [[1,1],[1,1]],
+    T: [[0,1,0],[1,1,1],[0,0,0]],
+    S: [[0,1,1],[1,1,0],[0,0,0]],
+    Z: [[1,1,0],[0,1,1],[0,0,0]],
+    J: [[1,0,0],[1,1,1],[0,0,0]],
+    L: [[0,0,1],[1,1,1],[0,0,0]]
+  };
+  const PIECE_KEYS = Object.keys(SHAPES);
+
+  function rotateMatrixCW(m){
+    const n = m.length;
+    const res = [];
+    for(let i=0;i<n;i++) res.push(new Array(n).fill(0));
+    for(let r=0;r<n;r++){
+      for(let c=0;c<n;c++){
+        res[c][n-1-r] = m[r][c];
+      }
+    }
+    return res;
+  }
+
+  // Sorteio "7-bag": cada saco contém as 7 peças embaralhadas e é consumido
+  // por inteiro antes de um novo ser criado. Garante distribuição equilibrada
+  // (sem longas secas de uma peça nem sequências repetidas demais).
+  let pieceBag = [];
+  function resetBag(){ pieceBag = []; }
+  function randomPieceKey(){
+    if(pieceBag.length === 0){
+      pieceBag = PIECE_KEYS.slice();
+      for(let i = pieceBag.length - 1; i > 0; i--){
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = pieceBag[i]; pieceBag[i] = pieceBag[j]; pieceBag[j] = tmp;
+      }
+    }
+    return pieceBag.pop();
+  }
+
+  function makePiece(key){
+    return {
+      key: key,
+      matrix: SHAPES[key].map(row => row.slice()),
+      row: 0,
+      col: 0
+    };
+  }
+
+  /* ============================================================
+     GAME — board logic, rendering, loop
+     ============================================================ */
+  const COLS = 10, ROWS = 20;
+  const CELL = 28; // px per cell, scaled responsively below
+
+  const Game = (function(){
+    let canvas, ctx, nextCanvas, nextCtx;
+    let board;             // ROWS x COLS of 0/1 (locked cells)
+    let current, next;
+    let score, level, lines;
+    let dropTimer, dropInterval;
+    let running = false, paused = false;
+    let lastTime = 0;
+    let rafId = null;
+    let cellSize = CELL;
+    let newRecordThisRun = false;
+    let renderMode = "ana";   // "ana" = anaglifo (original) | "vr" = lado a lado
+    let vrCanvas = null, vrCtx = null, vrDpr = 1, vrCell = 0;
+
+    function init(){
+      canvas = document.getElementById("board-canvas");
+      ctx = canvas.getContext("2d");
+      nextCanvas = document.getElementById("next-canvas");
+      nextCtx = nextCanvas.getContext("2d");
+      vrCanvas = document.getElementById("vr-canvas");
+      resizeCanvas();
+      window.addEventListener("resize", resizeCanvas);
+    }
+
+    function setMode(m){ renderMode = (m === "vr") ? "vr" : "ana"; }
+    function vrCellCss(){ return vrCell / (vrDpr || 1); }
+
+    function resizeCanvas(){
+      if(renderMode === "vr"){ vrResize(); return; }
+      const maxH = window.innerHeight - 40;
+      const maxW = Math.min(window.innerWidth - 220, window.innerWidth * 0.62);
+      cellSize = Math.max(14, Math.floor(Math.min(maxH / ROWS, maxW / COLS)));
+      canvas.width = cellSize * COLS;
+      canvas.height = cellSize * ROWS;
+      if(running) draw();
+    }
+
+    function emptyBoard(){
+      const b = [];
+      for(let r=0;r<ROWS;r++) b.push(new Array(COLS).fill(0));
+      return b;
+    }
+
+    function start(){
+      resetBag();
+      newRecordThisRun = false;
+      board = emptyBoard();
+      score = 0; level = 1; lines = 0;
+      dropInterval = 1000;
+      dropTimer = 0;
+      lastTime = 0;
+      next = makePiece(randomPieceKey());
+      spawnPiece();
+      updateStats();
+      running = true; paused = false;
+      resizeCanvas();
+      refreshTherapyHud(true);
+      if(rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(loop);
+    }
+
+    function stop(){
+      running = false; paused = false;
+      if(rafId) cancelAnimationFrame(rafId);
+      rafId = null;
+      Progress.save();
+    }
+
+    function pause(){ paused = true; Progress.save(); }
+    function resume(){
+      if(!running) return;
+      paused = false;
+      lastTime = 0;
+      if(!rafId) rafId = requestAnimationFrame(loop);
+    }
+    function isRunning(){ return running && !paused; }
+
+    function spawnPiece(){
+      current = next;
+      next = makePiece(randomPieceKey());
+      current.row = 0;
+      current.col = Math.floor((COLS - current.matrix[0].length) / 2);
+      if(collides(current, 0, 0)){
+        gameOver();
+      }
+      drawNext();
+    }
+
+    function collides(piece, dRow, dCol, matrix){
+      const m = matrix || piece.matrix;
+      for(let r=0;r<m.length;r++){
+        for(let c=0;c<m[r].length;c++){
+          if(!m[r][c]) continue;
+          const nr = piece.row + r + dRow;
+          const nc = piece.col + c + dCol;
+          if(nc < 0 || nc >= COLS || nr >= ROWS) return true;
+          if(nr >= 0 && board[nr][nc]) return true;
+        }
+      }
+      return false;
+    }
+
+    function move(dCol){
+      if(!isRunning()) return;
+      if(!collides(current, 0, dCol)){
+        current.col += dCol;
+      }
+    }
+
+    function softDrop(){
+      if(!isRunning()) return;
+      if(!collides(current, 1, 0)){
+        current.row += 1;
+        score += 1;
+        updateStats();
+      } else {
+        lockPiece();
+      }
+      dropTimer = 0;
+    }
+
+    function hardDrop(){
+      if(!isRunning()) return;
+      let dist = 0;
+      while(!collides(current, dist+1, 0)) dist++;
+      current.row += dist;
+      score += dist * 2;
+      updateStats();
+      lockPiece();
+      dropTimer = 0;
+    }
+
+    function rotate(){
+      if(!isRunning()) return;
+      const rotated = rotateMatrixCW(current.matrix);
+      const kicks = [0, -1, 1, -2, 2];
+      for(let i=0;i<kicks.length;i++){
+        if(!collides(current, 0, kicks[i], rotated)){
+          current.matrix = rotated;
+          current.col += kicks[i];
+          return;
+        }
+      }
+      // no valid position found; rotation is skipped
+    }
+
+    function lockPiece(){
+      const m = current.matrix;
+      for(let r=0;r<m.length;r++){
+        for(let c=0;c<m[r].length;c++){
+          if(!m[r][c]) continue;
+          const br = current.row + r, bc = current.col + c;
+          if(br >= 0 && br < ROWS && bc >= 0 && bc < COLS) board[br][bc] = current.key; // guarda o tipo (truthy); o modo VR usa para colorir
+        }
+      }
+      clearLines();
+      spawnPiece();
+    }
+
+    function clearLines(){
+      let cleared = 0;
+      for(let r=ROWS-1;r>=0;r--){
+        if(board[r].every(cell => cell)){
+          board.splice(r,1);
+          board.unshift(new Array(COLS).fill(0));
+          cleared++;
+          r++; // re-check same index after shift
+        }
+      }
+      if(cleared > 0){
+        const points = [0,100,300,500,800][cleared] || 800;
+        score += points * level;
+        lines += cleared;
+        level = 1 + Math.floor(lines / 10);
+        dropInterval = Math.max(120, 1000 - (level-1)*75);
+        updateStats();
+        flashBoard();
+      }
+    }
+
+    function flashBoard(){
+      canvas.classList.remove("lines-flash");
+      void canvas.offsetWidth;
+      canvas.classList.add("lines-flash");
+    }
+
+    function updateStats(){
+      if(Progress.noteScore(score)) newRecordThisRun = true;
+      document.getElementById("stat-high").textContent = Progress.high();
+      document.getElementById("stat-score").textContent = score;
+      document.getElementById("stat-level").textContent = level;
+      document.getElementById("stat-lines").textContent = lines;
+    }
+
+    function gameOver(){
+      stop();
+      if(renderMode === "vr"){
+        const pendVr = Progress.pendingCelebration();
+        vrUI.mode = "over";
+        vrUI.over = {
+          line1: "Pontuação: " + score,
+          line2: "Nível " + level + " · Linhas " + lines,
+          record: newRecordThisRun ? "NOVO RECORDE: " + score + "!" : "Recorde: " + Progress.high(),
+          unlock: pendVr ? "Marco desbloqueado: " + pendVr.title + "!" : "Hoje: " + fmtClock(Progress.todaySeconds()) + " de terapia",
+          quote: "“" + randomQuote() + "”"
+        };
+        drawVR();
+        return;
+      }
+      document.getElementById("gameover-summary").textContent =
+        "Pontuação: " + score + " · Nível: " + level + " · Linhas: " + lines;
+      document.getElementById("gameover-record").textContent = newRecordThisRun
+        ? "🏆 Novo recorde: " + score + "!"
+        : "Recorde: " + Progress.high();
+      const pend = Progress.pendingCelebration();
+      document.getElementById("gameover-unlock").textContent = pend
+        ? "🎉 Marco desbloqueado: " + pend.title + "!"
+        : "Hoje: " + fmtClock(Progress.todaySeconds()) + " de terapia";
+      document.getElementById("gameover-quote").textContent = "“" + randomQuote() + "”";
+      setOverlay(document.getElementById("overlay-gameover"), true);
+      focusFirst(document.getElementById("overlay-gameover").querySelector(".overlay-panel"));
+    }
+
+    /* ---------------- rendering ---------------- */
+    function draw(){
+      if(renderMode === "vr"){ drawVR(); return; }
+      ctx.clearRect(0,0,canvas.width, canvas.height);
+
+      // locked pieces — Eye 2 color
+      const eye2 = currentEye2Color();
+      for(let r=0;r<ROWS;r++){
+        for(let c=0;c<COLS;c++){
+          if(board[r][c]) drawCell(c, r, eye2);
+        }
+      }
+
+      // falling piece — Eye 1 color
+      if(current){
+        const eye1 = currentEye1Color();
+        const m = current.matrix;
+        for(let r=0;r<m.length;r++){
+          for(let c=0;c<m[r].length;c++){
+            if(!m[r][c]) continue;
+            const br = current.row + r, bc = current.col + c;
+            if(br >= 0) drawCell(bc, br, eye1);
+          }
+        }
+      }
+
+    }
+
+    /* ---------------- modo VR (lado a lado) ----------------
+       A tela é dividida ao meio. Cada metade é desenhada de forma independente:
+       um olho vê só a peça que cai e o outro só a pilha de peças (cores completas).
+       A moldura do tabuleiro e o placar aparecem nos dois olhos (ajudam a fundir). */
+    const VR_FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+
+    function vrResize(){
+      if(!vrCanvas) return;
+      vrDpr = Math.min(window.devicePixelRatio || 1, 2);
+      vrCanvas.width = Math.max(2, Math.floor(window.innerWidth * vrDpr));
+      vrCanvas.height = Math.max(2, Math.floor(window.innerHeight * vrDpr));
+      vrCtx = vrCanvas.getContext("2d");
+      drawVR();
+    }
+
+    function vrText(c, text, x, y, size, color, alpha, align, weight){
+      c.globalAlpha = alpha;
+      c.fillStyle = color;
+      c.font = (weight || "400") + " " + Math.round(size) + "px " + VR_FONT;
+      c.textAlign = align || "center";
+      c.textBaseline = "middle";
+      c.fillText(text, x, y);
+    }
+
+    // Escreve um parágrafo com quebra de linha; devolve o próximo y livre.
+    function vrPara(c, text, x, y, size, color, alpha, maxW, lineH, weight){
+      c.font = (weight || "400") + " " + Math.round(size) + "px " + VR_FONT;
+      const words = String(text).split(" ");
+      let line = "";
+      const lines_ = [];
+      words.forEach(function(w){
+        const t = line ? line + " " + w : w;
+        if(c.measureText(t).width > maxW && line){ lines_.push(line); line = w; }
+        else { line = t; }
+      });
+      if(line) lines_.push(line);
+      lines_.forEach(function(ln, i){
+        vrText(c, ln, x, y + i * lineH, size, color, alpha, "center", weight);
+      });
+      return y + lines_.length * lineH;
+    }
+
+    function vrFillCell(c, x, y, size, gap, color, alpha){
+      c.globalAlpha = alpha;
+      c.fillStyle = color;
+      c.fillRect(x + gap, y + gap, size - 2 * gap, size - 2 * gap);
+    }
+
+    function drawVrOverlay(c, cx, ox, oy, boardW, boardH, cell, bright){
+      c.globalAlpha = 0.92;
+      c.fillStyle = "#000";
+      c.fillRect(ox, oy, boardW, boardH);
+      const fs = Math.max(10, cell * 0.55);
+      if(vrUI.mode === "pause"){
+        vrText(c, "PAUSA", cx, oy + cell * 1.6, fs * 1.5, "#ffffff", bright, "center", "700");
+        VR_MENU.forEach(function(it, i){
+          const y = oy + cell * (3.6 + i * 1.8);
+          const sel = (i === vrUI.sel);
+          if(sel){
+            c.globalAlpha = 0.18 * bright;
+            c.fillStyle = "#ffffff";
+            c.fillRect(ox + cell * 0.3, y - cell * 0.7, boardW - cell * 0.6, cell * 1.4);
+          }
+          vrText(c, it.label, ox + cell * 0.7, y, fs, sel ? "#ffffff" : "#aab4c1", bright, "left", sel ? "700" : "400");
+          if(it.key){
+            const v = it.fmt(vr[it.key]);
+            vrText(c, sel ? "‹ " + v + " ›" : v, ox + boardW - cell * 0.7, y, fs, sel ? "#ffffff" : "#aab4c1", bright, "right", sel ? "700" : "400");
+          }
+        });
+        vrText(c, "cima/baixo: escolher", cx, oy + boardH - cell * 2.6, fs * 0.72, "#8f9bab", bright);
+        vrText(c, "esq./dir.: ajustar", cx, oy + boardH - cell * 1.8, fs * 0.72, "#8f9bab", bright);
+        vrText(c, "Start: continuar · B: sair", cx, oy + boardH - cell * 1.0, fs * 0.72, "#8f9bab", bright);
+      } else if(vrUI.mode === "over" && vrUI.over){
+        const o = vrUI.over;
+        vrText(c, "FIM DE JOGO", cx, oy + cell * 2.2, fs * 1.5, "#ffffff", bright, "center", "700");
+        vrText(c, o.line1, cx, oy + cell * 4.2, fs, "#d5dde7", bright, "center", "600");
+        vrText(c, o.line2, cx, oy + cell * 5.4, fs * 0.9, "#d5dde7", bright);
+        vrText(c, o.record, cx, oy + cell * 7.2, fs, "#ffcf5a", bright, "center", "700");
+        let y = vrPara(c, o.unlock, cx, oy + cell * 9, fs * 0.85, "#5cd8a4", bright, boardW * 0.9, cell * 1.1);
+        vrPara(c, o.quote, cx, y + cell * 0.8, fs * 0.72, "#8f9bab", bright, boardW * 0.88, cell * 1.0);
+        vrText(c, "A / toque: jogar de novo", cx, oy + boardH - cell * 1.8, fs * 0.78, "#cfd8e3", bright);
+        vrText(c, "B: menu", cx, oy + boardH - cell * 0.9, fs * 0.78, "#cfd8e3", bright);
+      }
+    }
+
+    function drawVR(){
+      if(!vrCtx || !vrCanvas) return;
+      const c = vrCtx;
+      const W = vrCanvas.width, H = vrCanvas.height;
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.globalAlpha = 1;
+      c.fillStyle = "#000";
+      c.fillRect(0, 0, W, H);
+      if(H > W){
+        vrText(c, "Gire o celular para a horizontal", W / 2, H / 2, Math.min(W, H) * 0.05, "#ffffff", 0.9);
+        return;
+      }
+      if(!board) return;
+
+      const halfW = W / 2;
+      const cell = Math.max(8, Math.floor(Math.min(H * 0.84 / ROWS, halfW * 0.62 / COLS) * vr.scale / 100));
+      vrCell = cell;
+      const boardW = cell * COLS, boardH = cell * ROWS;
+      const boardTop = Math.round((H - boardH) / 2 + H * 0.04);
+      const fsHud = Math.max(10, H * 0.03);
+      const fallingEye = (vr.leftSees === "falling") ? 0 : 1;   // 0 = esquerdo, 1 = direito
+      const sepPx = vr.sep / 100 * halfW;
+      const pxPerDeg = halfW / Math.max(20, vr.fov);
+      const dpPx = function(dp){ return Math.atan(dp / 100) * 180 / Math.PI * pxPerDeg; };
+      const lw = Math.max(2, Math.round(cell * 0.07));
+      const gap = Math.max(1, Math.round(cell * 0.05));
+      const bright = vr.brightness / 100;
+
+      for(let e = 0; e < 2; e++){
+        const isLeft = (e === 0);
+        const contrast = (isLeft ? vr.contrastL : vr.contrastR) / 100 * bright;
+        // Positivo = em direção ao nariz: para o olho esquerdo é +x, para o direito é −x.
+        const nasal = sepPx + dpPx(isLeft ? vr.hL : vr.hR);
+        const cx = isLeft ? (halfW / 2 + nasal) : (halfW + halfW / 2 - nasal);
+        const dy = -dpPx(isLeft ? vr.vL : vr.vR);
+        const ox = Math.round(cx - boardW / 2);
+        const oy = Math.round(boardTop + dy);
+
+        c.save();
+        c.beginPath();
+        c.rect(e * halfW, 0, halfW, H);
+        c.clip();
+
+        // Placar: idêntico nos dois olhos.
+        vrText(c, "PONTOS " + score + "   NÍVEL " + level + "   LINHAS " + lines,
+          cx, H * 0.045 + dy, fsHud, "#d5dde7", 0.85 * bright, "center", "600");
+        vrText(c, "RECORDE " + Progress.high() + "   HOJE " + fmtClock(Progress.todaySeconds()) + " / " + fmtClock(DAILY_GOAL_SEC),
+          cx, H * 0.09 + dy, fsHud * 0.8, "#8f9bab", 0.85 * bright);
+
+        // Moldura neutra: visível aos dois olhos (âncora de fusão).
+        c.globalAlpha = 0.6 * bright;
+        c.strokeStyle = "#ffffff";
+        c.lineWidth = lw;
+        c.strokeRect(ox - lw / 2, oy - lw / 2, boardW + lw, boardH + lw);
+
+        // Conteúdo exclusivo deste olho.
+        if(e !== fallingEye){
+          for(let r = 0; r < ROWS; r++){
+            for(let col = 0; col < COLS; col++){
+              const k = board[r][col];
+              if(k) vrFillCell(c, ox + col * cell, oy + r * cell, cell, gap, VR_COLORS[k] || "#9aa4b2", contrast);
+            }
+          }
+        } else {
+          if(current){
+            const m = current.matrix;
+            const colr = VR_COLORS[current.key] || "#9aa4b2";
+            for(let r = 0; r < m.length; r++){
+              for(let col = 0; col < m[r].length; col++){
+                if(!m[r][col]) continue;
+                const br = current.row + r, bc = current.col + col;
+                if(br >= 0) vrFillCell(c, ox + bc * cell, oy + br * cell, cell, gap, colr, contrast);
+              }
+            }
+          }
+          if(next){
+            // Próxima peça: do lado temporal (longe do divisor do visor), só neste olho.
+            const m = next.matrix;
+            let minR = 9, maxR = -1, minC = 9, maxC = -1;
+            for(let r = 0; r < m.length; r++){
+              for(let col = 0; col < m[r].length; col++){
+                if(!m[r][col]) continue;
+                if(r < minR) minR = r; if(r > maxR) maxR = r;
+                if(col < minC) minC = col; if(col > maxC) maxC = col;
+              }
+            }
+            const ms = Math.max(6, Math.round(cell * 0.6));
+            const nx = isLeft ? (ox - lw - ms * 5.2) : (ox + boardW + lw + ms * 1.2);
+            const ny = oy + cell;
+            vrText(c, "PRÓXIMA", nx + ms * 2, ny - ms * 0.9, fsHud * 0.7, "#8f9bab", contrast);
+            const bw = (maxC - minC + 1) * ms, bh = (maxR - minR + 1) * ms;
+            const x0 = nx + ms * 2 - bw / 2, y0 = ny + ms - bh / 2;
+            const nc = VR_COLORS[next.key] || "#9aa4b2";
+            for(let r = minR; r <= maxR; r++){
+              for(let col = minC; col <= maxC; col++){
+                if(m[r][col]) vrFillCell(c, x0 + (col - minC) * ms, y0 + (r - minR) * ms, ms, 1, nc, contrast);
+              }
+            }
+          }
+        }
+
+        if(vrUI.mode === "pause" || vrUI.mode === "over"){
+          drawVrOverlay(c, cx, ox, oy, boardW, boardH, cell, bright);
+        }
+        c.restore();
+      }
+    }
+
+    function drawCell(col, row, color){
+      // IMPORTANT: no neutral/white border. A border would be visible to both
+      // eyes and would defeat the dichoptic separation.
+      ctx.fillStyle = color;
+      ctx.fillRect(col*cellSize, row*cellSize, cellSize, cellSize);
+    }
+
+    function drawNext(){
+      nextCtx.clearRect(0,0,nextCanvas.width, nextCanvas.height);
+      if(!next) return;
+      const m = next.matrix;
+      const size = m.length;
+      const cs = Math.floor(Math.min(nextCanvas.width, nextCanvas.height) / (size+1));
+      const offsetX = (nextCanvas.width - cs*size)/2;
+      const offsetY = (nextCanvas.height - cs*size)/2;
+      const color = currentEye1Color();
+      for(let r=0;r<size;r++){
+        for(let c=0;c<size;c++){
+          if(!m[r][c]) continue;
+          nextCtx.fillStyle = color;
+          nextCtx.fillRect(offsetX+c*cs, offsetY+r*cs, cs, cs);
+        }
+      }
+    }
+
+    function renderOnly(){
+      if(canvas) draw();
+      drawNext();
+    }
+
+    /* ---------------- main loop ---------------- */
+    function loop(ts){
+      if(!running || paused){ rafId = null; return; }
+      if(!lastTime) lastTime = ts;
+      const dt = ts - lastTime;
+      lastTime = ts;
+
+      // Tempo de terapia: só conta enquanto o jogo está rodando (sem pausa).
+      Progress.addTime(Math.min(dt, 250));
+      refreshTherapyHud(false);
+
+      dropTimer += dt;
+      if(dropTimer >= dropInterval){
+        dropTimer = 0;
+        if(!collides(current, 1, 0)){
+          current.row += 1;
+        } else {
+          lockPiece();
+        }
+      }
+
+      draw();
+      rafId = requestAnimationFrame(loop);
+    }
+
+    return {
+      init, start, stop, pause, resume, isRunning,
+      move, softDrop, hardDrop, rotate,
+      renderOnly, setMode, vrCellCss
+    };
+  })();
+
+  /* ============================================================
+     KEYBOARD INPUT
+     ============================================================ */
+  document.addEventListener("keydown", function(ev){
+    const overlayOpen = overlayPause.classList.contains("active") || overlayGameOver.classList.contains("active");
+    const onMenu = screens.menu.classList.contains("active");
+    const onCalib = screens.calib.classList.contains("active");
+    const onGame = screens.game.classList.contains("active") && !overlayOpen;
+
+    if(onGame && Game.isRunning()){
+      switch(ev.key){
+        case "ArrowLeft": Game.move(-1); ev.preventDefault(); return;
+        case "ArrowRight": Game.move(1); ev.preventDefault(); return;
+        case "ArrowDown": Game.softDrop(); ev.preventDefault(); return;
+        case "ArrowUp": case " ": Game.rotate(); ev.preventDefault(); return;
+        case "p": case "P": case "Escape":
+          Game.pause();
+          setOverlay(overlayPause, true);
+          focusFirst(overlayPause.querySelector(".overlay-panel"));
+          ev.preventDefault();
+          return;
+      }
+      return;
+    }
+
+    // modo VR: jogo, menu de pausa e fim de jogo têm teclas próprias
+    if(screens.vr.classList.contains("active")){
+      handleVrKey(ev);
+      return;
+    }
+    if(screens.vrsetup.classList.contains("active")){
+      if(ev.key === "Escape"){ handleAction("vr-back"); ev.preventDefault(); }
+      return;
+    }
+
+    // journey screen: arrows scroll, Enter / Esc go back
+    if(screens.journey.classList.contains("active")){
+      const jp = document.getElementById("journey-panel");
+      switch(ev.key){
+        case "ArrowDown": jp.scrollTop += 80; ev.preventDefault(); return;
+        case "ArrowUp": jp.scrollTop -= 80; ev.preventDefault(); return;
+        case "e": case "E":
+          if(!ev.repeat) handleAction("export-progress");
+          ev.preventDefault(); return;
+        case "Enter": case "Escape":
+          if(!ev.repeat) handleAction("back-journey");
+          ev.preventDefault(); return;
+      }
+      return;
+    }
+
+    // navigation contexts: menu / calib / overlays
+    const container = currentInteractiveContainer();
+    if(!container) return;
+    switch(ev.key){
+      case "ArrowDown": case "ArrowRight":
+        moveFocus(container, 1); ev.preventDefault(); break;
+      case "ArrowUp": case "ArrowLeft":
+        moveFocus(container, -1); ev.preventDefault(); break;
+      case "Enter":
+        activateFocused(container); ev.preventDefault(); break;
+      case "Escape": case "p": case "P":
+        if(overlayPause.classList.contains("active")){
+          setOverlay(overlayPause, false);
+          Game.resume();
+        } else if(onCalib){
+          handleAction("back-calib");
+        }
+        ev.preventDefault();
+        break;
+    }
+  });
+
+  /* ============================================================
+     GAMEPAD INPUT (Bluetooth controllers via Gamepad API)
+     ============================================================ */
+  const GamepadInput = (function(){
+    let connected = false;
+    const cooldowns = {};
+    const COOLDOWN_MS = 140;
+    const AXIS_THRESHOLD = 0.5;
+    let prevButtons = [];
+    let pollRaf = null;
+
+    window.addEventListener("gamepadconnected", function(){
+      connected = true;
+      updateIndicators();
+    });
+    window.addEventListener("gamepaddisconnected", function(){
+      connected = false;
+      prevButtons = [];
+      updateIndicators();
+    });
+
+    function updateIndicators(){
+      const dots = [document.getElementById("menu-pad-dot"), document.getElementById("game-pad-dot")];
+      const texts = [document.getElementById("menu-pad-text"), document.getElementById("game-pad-text")];
+      dots.forEach(d => d && d.classList.toggle("on", connected));
+      texts.forEach(t => t && (t.textContent = connected ? "Controle conectado" : "Controle desconectado"));
+    }
+
+    function ready(action){
+      const now = performance.now();
+      if(!cooldowns[action] || now - cooldowns[action] >= COOLDOWN_MS){
+        cooldowns[action] = now;
+        return true;
+      }
+      return false;
+    }
+
+    function getPad(){
+      const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      for(let i=0;i<pads.length;i++){ if(pads[i]) return pads[i]; }
+      return null;
+    }
+
+    function justPressed(pad, idx){
+      const nowPressed = !!(pad.buttons[idx] && pad.buttons[idx].pressed);
+      const wasPressed = !!prevButtons[idx];
+      return nowPressed && !wasPressed;
+    }
+
+    function adjustFocusedSlider(container, delta){
+      // Only handle horizontal input here. With delta === 0 (e.g. Arrow Down),
+      // return false so the caller can move focus to the next component.
+      if(delta === 0) return false;
+      const items = getFocusableIn(container);
+      const focused = items.find(i => i.classList.contains("focused"));
+      if(!focused || focused.type !== "range") return false;
+      const min = Number(focused.min || 0);
+      const max = Number(focused.max || 100);
+      const step = Number(focused.step || 1);
+      const value = Math.max(min, Math.min(max, Number(focused.value) + delta * step));
+      if(value !== Number(focused.value)){
+        focused.value = value;
+        focused.dispatchEvent(new Event("input", {bubbles:true}));
+      }
+      return true;
+    }
+
+    function poll(){
+      const pad = getPad();
+      const wasConnected = connected;
+      connected = !!pad;
+      if(connected !== wasConnected) updateIndicators();
+
+      if(!pad){
+        prevButtons = [];
+        pollRaf = requestAnimationFrame(poll);
+        return;
+      }
+
+      const btn = idx => !!(pad.buttons[idx] && pad.buttons[idx].pressed);
+      const axisX = pad.axes[0] || 0;
+      const axisY = pad.axes[1] || 0;
+      const dpadLeft = btn(14) || axisX < -AXIS_THRESHOLD;
+      const dpadRight = btn(15) || axisX > AXIS_THRESHOLD;
+      const dpadDown = btn(13) || axisY > AXIS_THRESHOLD;
+      const dpadUp = btn(12) || axisY < -AXIS_THRESHOLD;
+      const confirmPressed = justPressed(pad, 0);
+      const backPressed = justPressed(pad, 1);
+      const startPressed = justPressed(pad, 9);
+
+      const overlayPauseOpen = overlayPause.classList.contains("active");
+      const overlayGameOverOpen = overlayGameOver.classList.contains("active");
+      const onGamePlaying = screens.game.classList.contains("active") && !overlayPauseOpen && !overlayGameOverOpen && Game.isRunning();
+      const onCalib = screens.calib.classList.contains("active");
+      const onJourney = screens.journey.classList.contains("active");
+      const onVR = screens.vr.classList.contains("active");
+
+      if(onVR){
+        if(vrUI.mode === "play"){
+          if(Game.isRunning()){
+            if(dpadLeft && ready("left")) Game.move(-1);
+            if(dpadRight && ready("right")) Game.move(1);
+            if(dpadDown && ready("down")) Game.softDrop();
+            if(confirmPressed) Game.rotate();
+            if(startPressed) vrPause();
+          }
+        } else if(vrUI.mode === "pause"){
+          if(dpadDown && ready("navdown")) vrMenuMove(1);
+          if(dpadUp && ready("navup")) vrMenuMove(-1);
+          if(dpadLeft && ready("adjl")) vrMenuAdjust(-1);
+          if(dpadRight && ready("adjr")) vrMenuAdjust(1);
+          if(confirmPressed) vrMenuActivate();
+          else if(startPressed) vrResume();
+          else if(backPressed) vrQuit();
+        } else if(vrUI.mode === "over"){
+          if(confirmPressed) vrRestart();
+          else if(backPressed || startPressed) vrQuit();
+        }
+      } else if(onGamePlaying){
+        if(dpadLeft && ready("left")) Game.move(-1);
+        if(dpadRight && ready("right")) Game.move(1);
+        if(dpadDown && ready("down")) Game.softDrop();
+        if(confirmPressed) Game.rotate();
+        if(startPressed){
+          handleAction("pause-game");
+        }
+      } else if(onJourney){
+        const jp = document.getElementById("journey-panel");
+        if(dpadDown) jp.scrollTop += 14;
+        if(dpadUp) jp.scrollTop -= 14;
+        if(justPressed(pad, 2)) handleAction("export-progress");
+        if(confirmPressed || backPressed) handleAction("back-journey");
+      } else if(onCalib){
+        const container = currentInteractiveContainer();
+        if(container){
+          const horizontalOnSlider = adjustFocusedSlider(container, dpadRight ? 1 : dpadLeft ? -1 : 0);
+          if(!horizontalOnSlider){
+            if(dpadDown && ready("navdown")) moveFocus(container, 1);
+            if(dpadUp && ready("navup")) moveFocus(container, -1);
+          }
+          if(confirmPressed){
+            const focused = getFocusableIn(container).find(i => i.classList.contains("focused"));
+            if(focused && focused.matches("input[type=range]")){
+              // A on a slider is intentionally a no-op; use left/right to adjust.
+            } else {
+              activateFocused(container);
+            }
+          }
+          if(backPressed) handleAction("back-calib");
+        }
+      } else {
+        const container = currentInteractiveContainer();
+        if(container){
+          if(dpadDown && ready("navdown")) moveFocus(container, 1);
+          if(dpadUp && ready("navup")) moveFocus(container, -1);
+          if(confirmPressed) activateFocused(container);
+        }
+        if(startPressed && overlayPauseOpen){
+          handleAction("resume-game");
+        } else if(backPressed){
+          if(overlayPauseOpen){
+            handleAction("quit-to-menu");
+          } else if(overlayGameOverOpen){
+            handleAction("quit-to-menu");
+          }
+        }
+      }
+
+      prevButtons = pad.buttons.map(b => !!b.pressed);
+      pollRaf = requestAnimationFrame(poll);
+    }
+
+    function start(){
+      if(!pollRaf) pollRaf = requestAnimationFrame(poll);
+    }
+
+    return { poll, start };
+  })();
+
+  /* ============================================================
+     BOOTSTRAP
+     ============================================================ */
+  Game.init();
+  populateCalibForm();
+  refreshMenu();
+  focusFirst(screens.menu);
+  GamepadInput.start();
+
+  // Aba oculta = jogo pausado automaticamente (não conta como terapia) e progresso salvo.
+  document.addEventListener("visibilitychange", function(){
+    if(!document.hidden && screens.vr.classList.contains("active")) acquireWakeLock();
+    if(document.hidden){
+      if(screens.vr.classList.contains("active")){
+        vrPause();
+      } else if(Game.isRunning()){
+        Game.pause();
+        setOverlay(overlayPause, true);
+        focusFirst(overlayPause.querySelector(".overlay-panel"));
+      }
+      Progress.save();
+    }
+  });
+  // Saiu da tela cheia (gesto "voltar") durante o modo VR: pausa o jogo.
+  document.addEventListener("fullscreenchange", function(){
+    if(!document.fullscreenElement && screens.vr.classList.contains("active")) vrPause();
+  });
+  setupVrTouch();
+  window.addEventListener("pagehide", function(){ Progress.save(); });
+  window.addEventListener("beforeunload", function(){ Progress.save(); });
+
+})();
+</script>
+</body>
+</html>
